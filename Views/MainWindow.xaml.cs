@@ -119,9 +119,13 @@ public partial class MainWindow : Window
         }
     }
 
+    /// Selector.SelectionChanged bubbles, so picking a grid row or a combo box
+    /// item inside a tab also raises this event on the TabControl. Reloading
+    /// the tab from there rebuilt the grid under the mouse and swallowed the
+    /// click that started it.
     private void OnTabChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!IsLoaded) return;
+        if (!IsLoaded || !ReferenceEquals(e.OriginalSource, Tabs)) return;
         switch (Tabs.SelectedIndex)
         {
             case 0:
@@ -190,7 +194,11 @@ public partial class MainWindow : Window
 
     private async Task RunPrint(string status, Func<Task> work)
     {
-        if (_printBusy) return;
+        if (_printBusy)
+        {
+            SetStatus("Печать уже выполняется — дождитесь окончания");
+            return;
+        }
         _printBusy = true;
         SetStatus(status);
         try { await Task.Run(work); }
@@ -563,14 +571,34 @@ public partial class MainWindow : Window
 
     private async void OnCatalogPrintMenu(object sender, RoutedEventArgs e)
     {
-        if (CatalogGrid.SelectedItem is not CatalogRow row) return;
+        if (CatalogGrid.SelectedItem is not CatalogRow row)
+        {
+            SetStatus("Выберите товар в списке");
+            return;
+        }
+        SetStatus($"Печать ШК: {row.Sku}...");
         await PrintCatalogBarcodeAsync(row.Id);
     }
 
     private async void OnCatalogAddBarcodeMenu(object sender, RoutedEventArgs e)
     {
-        if (CatalogGrid.SelectedItem is not CatalogRow row) return;
+        if (CatalogGrid.SelectedItem is not CatalogRow row)
+        {
+            SetStatus("Выберите товар в списке");
+            return;
+        }
+        SetStatus($"Добавление ШК: {row.Sku}...");
         await AddCatalogBarcodeAsync(row.Id);
+    }
+
+    /// Without a row under the cursor the menu would open and then do nothing.
+    private void OnCatalogContextOpening(object sender, ContextMenuEventArgs e)
+    {
+        if (CatalogGrid.SelectedItem is not CatalogRow)
+        {
+            SetStatus("Нажмите правой кнопкой на строку товара");
+            e.Handled = true;
+        }
     }
 
     private JsonMap? CatalogById(int id) =>
@@ -715,7 +743,7 @@ public partial class MainWindow : Window
         try
         {
             _fbsJobs = await _client.FbsMyJobsAsync();
-            var selected = _fbsJob?.IntOrNull("id");
+            var selected = _fbsPendingJobId > 0 ? _fbsPendingJobId : _fbsJob?.IntOrNull("id");
             if (selected is int sid)
             {
                 var idx = _fbsJobs.FindIndex(j => j.Int("id") == sid);
@@ -743,7 +771,9 @@ public partial class MainWindow : Window
                 Progress = $"{j.Int("line_done")}/{j.Int("line_total")}",
             });
         }
-        var selected = _fbsJob?.IntOrNull("id");
+        // A refresh that lands while a job is being opened must not drag the
+        // selection back to the previous job.
+        var selected = _fbsPendingJobId > 0 ? _fbsPendingJobId : _fbsJob?.IntOrNull("id");
         if (selected is int sid)
             FbsJobsGrid.SelectedItem = _fbsJobRows.FirstOrDefault(x => x.Id == sid);
         _fbsJobsFilling = false;
@@ -1368,7 +1398,11 @@ public partial class MainWindow : Window
 
     private async Task FbsRunAsync(Func<Task> work, string status)
     {
-        if (_fbsBusy) return;
+        if (_fbsBusy)
+        {
+            SetStatus("Предыдущая операция ещё выполняется");
+            return;
+        }
         _fbsBusy = true;
         SetStatus(status);
         try { await work(); }

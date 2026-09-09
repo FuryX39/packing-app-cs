@@ -313,7 +313,8 @@
                         <Button Content="Вперёд" Click="OnCatalogNext" x:Name="CatalogNext"/>
                     </StackPanel>
                     <DataGrid x:Name="CatalogGrid" Style="{StaticResource RowLinesGrid}" RowHeight="44"
-                              PreviewMouseRightButtonDown="OnGridRightButtonDown">
+                              PreviewMouseRightButtonDown="OnGridRightButtonDown"
+                              ContextMenuOpening="OnCatalogContextOpening">
                         <DataGrid.ContextMenu>
                             <ContextMenu>
                                 <MenuItem Header="Печать ШК" Click="OnCatalogPrintMenu"/>

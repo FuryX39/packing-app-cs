@@ -236,12 +236,10 @@ public sealed class ApiClient : IDisposable
     private async Task<byte[]> WebBytesAsync(string path, int timeoutSec, CancellationToken ct)
     {
         using var resp = await SendAsync(_web, "GET", Web(path), null, timeoutSec, ct);
-        var text = resp.Content.Headers.ContentType?.MediaType?.Contains("json") == true
-            ? await resp.Content.ReadAsStringAsync(ct)
-            : "";
+        var data = await resp.Content.ReadAsByteArrayAsync(ct);
         if (!resp.IsSuccessStatusCode)
-            Raise(resp, text);
-        return await resp.Content.ReadAsByteArrayAsync(ct);
+            Raise(resp, Encoding.UTF8.GetString(data));
+        return data;
     }
 
     private async Task<byte[]> ApiBytesAsync(string path, int timeoutSec, CancellationToken ct)
@@ -249,11 +247,16 @@ public sealed class ApiClient : IDisposable
         if (!ApiOk)
             throw new ApiException(ApiError.Length > 0 ? ApiError : "Нет сессии API — войдите снова");
         using var resp = await SendAsync(_apiHttp, "GET", Api(path), null, timeoutSec, ct);
+        var data = await resp.Content.ReadAsByteArrayAsync(ct);
         if (!resp.IsSuccessStatusCode)
-            Raise(resp, await resp.Content.ReadAsStringAsync(ct));
-        return await resp.Content.ReadAsByteArrayAsync(ct);
+            Raise(resp, Encoding.UTF8.GetString(data));
+        return data;
     }
 
+    /// The timeout guards the wait for response headers only, matching the
+    /// python client's read timeout. Downloading the body of a large job must
+    /// not race a deadline: a job with hundreds of lines legitimately takes
+    /// longer than any sane header timeout.
     private static async Task<HttpResponseMessage> SendAsync(HttpClient client, string method, string url, object? body, int timeoutSec, CancellationToken ct)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -263,7 +266,7 @@ public sealed class ApiClient : IDisposable
             req.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
         try
         {
-            return await client.SendAsync(req, cts.Token);
+            return await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cts.Token);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
