@@ -45,20 +45,51 @@ public partial class MainWindow : Window
     private List<int> _lastScanLineIds = [];
     private int? _prefetchJobId;
     private DispatcherTimer? _fbsSearchTimer;
-    private readonly Dictionary<string, ImageSource> _photoCache = [];
+
+    private readonly PhotoLoader _photos;
+    private readonly ObservableCollection<TaskRow> _taskRows = [];
+    private readonly ObservableCollection<AttachmentRow> _fileRows = [];
+    private readonly ObservableCollection<CatalogRow> _catalogRows = [];
+    private readonly ObservableCollection<FbsJobRow> _fbsJobRows = [];
+    private readonly ObservableCollection<FbsLineRow> _fbsLineRows = [];
+    private readonly ObservableCollection<RemainingRow> _remainingRows = [];
+
+    private CancellationTokenSource? _fbsOpenCts;
+    private readonly DispatcherTimer _prefetchTimer = new() { Interval = TimeSpan.FromMilliseconds(1200) };
+    private int _cacheHintJobId;
+    private int _cachedLabelsHave;
+    private int _cachedLabelsTotal;
+    private string _activeImageUrl = "";
 
     public MainWindow(AppConfig config, ApiClient client, string userName)
     {
         InitializeComponent();
         _config = config;
         _client = client;
+        _photos = new PhotoLoader(Dispatcher);
         Title = $"Warehouse Packing — {userName}";
         WindowState = WindowState.Maximized;
         FbsSkipMpBox.IsChecked = config.SkipMpConfirm;
+
+        // Assigned once: mutating the collections keeps user column widths and
+        // the current selection, re-assigning ItemsSource would reset both.
+        TasksGrid.ItemsSource = _taskRows;
+        FilesGrid.ItemsSource = _fileRows;
+        CatalogGrid.ItemsSource = _catalogRows;
+        FbsJobsGrid.ItemsSource = _fbsJobRows;
+        FbsLinesGrid.ItemsSource = _fbsLineRows;
+        FbsRemainingGrid.ItemsSource = _remainingRows;
+
         _tasksTimer.Tick += (_, _) =>
         {
             if (Tabs.SelectedIndex == 0)
                 _ = LoadTasksAsync(true);
+        };
+        _prefetchTimer.Tick += (_, _) =>
+        {
+            _prefetchTimer.Stop();
+            if (_fbsJob is not null)
+                _ = PrefetchLabelsAsync(_fbsJob, false);
         };
         Loaded += async (_, _) => await LoadTasksAsync(false);
     }
@@ -68,6 +99,8 @@ public partial class MainWindow : Window
     private async void OnClosing(object sender, System.ComponentModel.CancelEventArgs e)
     {
         _tasksTimer.Stop();
+        _prefetchTimer.Stop();
+        _fbsOpenCts?.Cancel();
         await _client.LogoutAsync();
         _client.Dispose();
     }
@@ -76,7 +109,7 @@ public partial class MainWindow : Window
 
     private void OnSettings(object sender, RoutedEventArgs e)
     {
-        var dlg = new SettingsWindow(_config, _client) { Owner = this, CacheHintChanged = UpdateFbsCacheHint };
+        var dlg = new SettingsWindow(_config, _client) { Owner = this, CacheHintChanged = InvalidateCacheHint };
         if (dlg.ShowDialog() == true)
         {
             _config = AppConfig.Load();
@@ -113,8 +146,32 @@ public partial class MainWindow : Window
             _tasksTimer.Start();
     }
 
+    private static T? FindParent<T>(DependencyObject? source) where T : DependencyObject
+    {
+        while (source is not null and not T)
+            source = source is System.Windows.Media.Visual or System.Windows.Media.Media3D.Visual3D
+                ? VisualTreeHelper.GetParent(source)
+                : LogicalTreeHelper.GetParent(source);
+        return source as T;
+    }
+
+    /// A right-click does not move the DataGrid selection on its own, so the
+    /// context menu would act on whatever was selected before.
+    private void OnGridRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not DataGrid grid)
+            return;
+        var row = FindParent<DataGridRow>(e.OriginalSource as DependencyObject);
+        if (row is null)
+            return;
+        grid.SelectedItem = row.Item;
+        row.IsSelected = true;
+    }
+
     private void ShowError(Exception ex)
     {
+        if (ex is OperationCanceledException)
+            return;
         if (ex is AuthException)
         {
             MessageBox.Show(this, ex.Message, "Сессия", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -141,58 +198,6 @@ public partial class MainWindow : Window
         finally { _printBusy = false; }
     }
 
-    private ImageSource? Thumb(string url, int size)
-    {
-        url = (url ?? "").Trim();
-        if (url.Length == 0) return null;
-        var key = $"{size}:{url}";
-        if (_photoCache.TryGetValue(key, out var cached))
-            return cached;
-        var data = ImageCache.GetCached(url);
-        if (data is null)
-        {
-            _ = EnsureImageAsync(url);
-            return null;
-        }
-        try
-        {
-            var img = BytesToImage(data, size);
-            _photoCache[key] = img;
-            return img;
-        }
-        catch { return null; }
-    }
-
-    private async Task EnsureImageAsync(string url)
-    {
-        if (!ImageCache.BeginFetch(url)) return;
-        var data = await ImageCache.FetchAsync(url);
-        if (data is null) return;
-        await Dispatcher.InvokeAsync(RefreshLoadedImages);
-    }
-
-    private void RefreshLoadedImages()
-    {
-        RenderCatalogPage();
-        RenderFbsLines();
-        if (FbsManualBox.IsChecked == true)
-            RenderRemaining();
-        RefreshActiveImage();
-    }
-
-    private static BitmapImage BytesToImage(byte[] data, int decode = 0)
-    {
-        var bmp = new BitmapImage();
-        bmp.BeginInit();
-        bmp.CacheOption = BitmapCacheOption.OnLoad;
-        bmp.StreamSource = new MemoryStream(data);
-        if (decode > 0)
-            bmp.DecodePixelWidth = decode;
-        bmp.EndInit();
-        bmp.Freeze();
-        return bmp;
-    }
-
     // --- Tasks ---
 
     private async void OnReloadTasks(object sender, RoutedEventArgs e) => await LoadTasksAsync(false);
@@ -211,17 +216,21 @@ public partial class MainWindow : Window
             return;
         }
         var selected = _currentTask?.IntOrNull("id");
-        TasksGrid.ItemsSource = _tasks.Select(t => new TaskRow
+        _taskRows.Clear();
+        foreach (var t in _tasks)
         {
-            Id = t.Int("id"),
-            Assembly = Paging.FormatDay(t.Str("start_date")),
-            Marketplace = t.Str("counterparty_name", "—"),
-            Ship = Paging.FormatDay(t.Str("end_date")),
-            Tag = Paging.ShipTag(t.Str("end_date")),
-        }).ToList();
+            _taskRows.Add(new TaskRow
+            {
+                Id = t.Int("id"),
+                Assembly = Paging.FormatDay(t.Str("start_date")),
+                Marketplace = t.Str("counterparty_name", "—"),
+                Ship = Paging.FormatDay(t.Str("end_date")),
+                Tag = Paging.ShipTag(t.Str("end_date")),
+            });
+        }
         if (selected is int sid)
         {
-            var row = ((IEnumerable<TaskRow>)TasksGrid.ItemsSource).FirstOrDefault(x => x.Id == sid);
+            var row = _taskRows.FirstOrDefault(x => x.Id == sid);
             if (row != null)
             {
                 TasksGrid.SelectedItem = row;
@@ -274,21 +283,17 @@ public partial class MainWindow : Window
         var task = _currentTask;
         RenderTaskStatus(task);
         TaskDescription.Text = task is null ? "" : (task.Str("description").Trim().Length > 0 ? task.Str("description") : "—");
-        var files = new ObservableCollection<AttachmentRow>();
-        if (task is not null)
+        _fileRows.Clear();
+        foreach (var att in task?.Arr("attachments") ?? [])
         {
-            foreach (var att in task.Arr("attachments"))
+            var kind = att.Str("kind");
+            _fileRows.Add(new AttachmentRow
             {
-                var kind = att.Str("kind");
-                files.Add(new AttachmentRow
-                {
-                    Id = att.Int("id"),
-                    Kind = kind == "a4" ? "А4" : kind == "label" ? "Этикетки" : kind,
-                    Filename = att.Str("filename", "file.pdf"),
-                });
-            }
+                Id = att.Int("id"),
+                Kind = kind == "a4" ? "А4" : kind == "label" ? "Этикетки" : kind,
+                Filename = att.Str("filename", "file.pdf"),
+            });
         }
-        FilesGrid.ItemsSource = files;
         var title = task?.Str("counterparty_name");
         if (string.IsNullOrWhiteSpace(title))
             title = task is null ? "" : $"Задание #{task.Str("id")}";
@@ -370,11 +375,10 @@ public partial class MainWindow : Window
         return kind is null ? all : all.Where(x => x.Str("kind") == kind).ToList();
     }
 
-    private async void OnFilePrintClick(object sender, MouseButtonEventArgs e)
+    private async void OnPrintAttachmentButton(object sender, RoutedEventArgs e)
     {
-        if (FilesGrid.CurrentColumn is not { DisplayIndex: 2 }) return;
-        if (FilesGrid.SelectedItem is not AttachmentRow row) return;
-        await PrintAttachmentAsync(row.Id);
+        if (sender is not Button { Tag: int attachmentId }) return;
+        await PrintAttachmentAsync(attachmentId);
     }
 
     private async Task PrintAttachmentAsync(int attachmentId)
@@ -512,7 +516,7 @@ public partial class MainWindow : Window
         var (visible, page) = Paging.Slice(_catalogFiltered, _catalogPage);
         _catalogPage = page;
         _catalogImageUrls.Clear();
-        var rows = new List<CatalogRow>();
+        _catalogRows.Clear();
         foreach (var p in visible)
         {
             var id = p.Int("id");
@@ -521,9 +525,10 @@ public partial class MainWindow : Window
             if (p.Flag("is_kit")) name += " (комплект)";
             var url = p.Str("image_url").Trim();
             _catalogImageUrls[id.ToString()] = url;
-            rows.Add(new CatalogRow { Id = id, Sku = p.Str("sku"), Name = name, Photo = url.Length > 0 ? Thumb(url, 32) : null });
+            var row = new CatalogRow { Id = id, Sku = p.Str("sku"), Name = name };
+            _catalogRows.Add(row);
+            _photos.Load(url, 40, img => row.Photo = img);
         }
-        CatalogGrid.ItemsSource = rows;
         CatalogPageLabel.Text = Paging.RangeLabel(_catalogFiltered.Count, _catalogPage);
         CatalogPrev.IsEnabled = _catalogPage > 0;
         CatalogNext.IsEnabled = _catalogPage + 1 < Paging.PageCount(_catalogFiltered.Count);
@@ -544,21 +549,22 @@ public partial class MainWindow : Window
         if (_catalogPage + 1 < Paging.PageCount(_catalogFiltered.Count)) { _catalogPage++; RenderCatalogPage(); }
     }
 
-    private async void OnCatalogPrintClick(object sender, MouseButtonEventArgs e)
+    private async void OnCatalogPrintButton(object sender, RoutedEventArgs e)
     {
-        if (CatalogGrid.CurrentColumn is not { DisplayIndex: 3 }) return;
+        if (sender is not Button { Tag: int productId }) return;
+        await PrintCatalogBarcodeAsync(productId);
+    }
+
+    private async void OnCatalogPrintMenu(object sender, RoutedEventArgs e)
+    {
         if (CatalogGrid.SelectedItem is not CatalogRow row) return;
         await PrintCatalogBarcodeAsync(row.Id);
     }
 
-    private void OnCatalogContext(object sender, MouseButtonEventArgs e)
+    private async void OnCatalogAddBarcodeMenu(object sender, RoutedEventArgs e)
     {
         if (CatalogGrid.SelectedItem is not CatalogRow row) return;
-        var menu = new ContextMenu();
-        var item = new MenuItem { Header = "Добавить ШК" };
-        item.Click += (_, _) => _ = AddCatalogBarcodeAsync(row.Id);
-        menu.Items.Add(item);
-        menu.IsOpen = true;
+        await AddCatalogBarcodeAsync(row.Id);
     }
 
     private JsonMap? CatalogById(int id) =>
@@ -589,24 +595,8 @@ public partial class MainWindow : Window
             }
             catch (Exception ex) { ShowError(ex); return; }
         }
-        Dictionary<string, string>? chosen = barcodes[0];
-        if (barcodes.Count > 1)
-        {
-            var menu = new ContextMenu();
-            Dictionary<string, string>? pick = null;
-            foreach (var bc in barcodes)
-            {
-                var mi = new MenuItem { Header = Paging.BarcodeComboLabel(bc) };
-                mi.Click += (_, _) => pick = bc;
-                menu.Items.Add(mi);
-            }
-            menu.IsOpen = true;
-            await Task.Delay(50);
-            // fallback: if user didn't click, show first via dialog-less pick of first after menu — use simple choice window
-            var choice = PickBarcode(barcodes);
-            if (choice is null) return;
-            chosen = choice;
-        }
+        var chosen = PickBarcode(barcodes);
+        if (chosen is null) return;
         await PrintBarcodeItemAsync(product, chosen);
     }
 
@@ -737,15 +727,19 @@ public partial class MainWindow : Window
         var (visible, page) = Paging.Slice(_fbsJobs, _fbsJobsPage);
         _fbsJobsPage = page;
         _fbsJobsFilling = true;
-        FbsJobsGrid.ItemsSource = visible.Select(j => new FbsJobRow
+        _fbsJobRows.Clear();
+        foreach (var j in visible)
         {
-            Id = j.Int("id"),
-            Status = Paging.JobStatusRu(j.Str("status")),
-            Progress = $"{j.Int("line_done")}/{j.Int("line_total")}",
-        }).ToList();
+            _fbsJobRows.Add(new FbsJobRow
+            {
+                Id = j.Int("id"),
+                Status = Paging.JobStatusRu(j.Str("status")),
+                Progress = $"{j.Int("line_done")}/{j.Int("line_total")}",
+            });
+        }
         var selected = _fbsJob?.IntOrNull("id");
         if (selected is int sid)
-            FbsJobsGrid.SelectedItem = ((IEnumerable<FbsJobRow>)FbsJobsGrid.ItemsSource).FirstOrDefault(x => x.Id == sid);
+            FbsJobsGrid.SelectedItem = _fbsJobRows.FirstOrDefault(x => x.Id == sid);
         _fbsJobsFilling = false;
         FbsJobsPageLabel.Text = Paging.RangeLabel(_fbsJobs.Count, _fbsJobsPage);
         FbsJobsPrev.IsEnabled = _fbsJobsPage > 0;
@@ -761,16 +755,43 @@ public partial class MainWindow : Window
     private async void OnFbsJobSelected(object sender, SelectionChangedEventArgs e)
     {
         if (_fbsJobsFilling || FbsJobsGrid.SelectedItem is not FbsJobRow row) return;
-        SetStatus("Открытие FBS...");
+        await OpenFbsJobAsync(row.Id);
+    }
+
+    /// Switching jobs abandons the previous request instead of queueing behind
+    /// it, so clicking through the list stays responsive.
+    private async Task OpenFbsJobAsync(int jobId)
+    {
+        _prefetchTimer.Stop();
+        var previous = _fbsOpenCts;
+        var cts = new CancellationTokenSource();
+        _fbsOpenCts = cts;
+        previous?.Cancel();
+        previous?.Dispose();
+        SetStatus($"Открытие задания #{jobId}...");
         try
         {
-            _fbsJob = await _client.FbsOpenJobAsync(row.Id);
+            var job = await _client.FbsOpenJobAsync(jobId, cts.Token);
+            if (!ReferenceEquals(_fbsOpenCts, cts)) return;
+            _fbsJob = job;
             RenderFbsJob();
-            SetStatus($"FBS задание #{_fbsJob.Str("id")}");
+            SetStatus($"FBS задание #{job.Str("id")}");
             FocusScan();
-            _ = PrefetchLabelsAsync(_fbsJob, false);
+            _prefetchTimer.Start();
         }
-        catch (Exception ex) { ShowError(ex); }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            if (ReferenceEquals(_fbsOpenCts, cts)) ShowFbsError(ex);
+        }
+        finally
+        {
+            if (ReferenceEquals(_fbsOpenCts, cts))
+            {
+                _fbsOpenCts = null;
+                cts.Dispose();
+            }
+        }
     }
 
     private void RenderFbsJob()
@@ -827,17 +848,16 @@ public partial class MainWindow : Window
             RenderRemaining();
     }
 
-    private void SetActiveImage(string url) => FbsActiveImage.Source = string.IsNullOrWhiteSpace(url) ? null : Thumb(url, 110);
-
-    private void RefreshActiveImage()
+    private void SetActiveImage(string url)
     {
-        var actives = ActiveLines();
-        if (actives.Count > 0) { SetActiveImage(actives[0].Str("image_url")); return; }
-        var last = LastPickedLines();
-        if (FbsSkipMpBox.IsChecked == true && last.Count > 0)
-            SetActiveImage(last[0].Str("image_url"));
-        else
-            SetActiveImage("");
+        var raw = (url ?? "").Trim();
+        _activeImageUrl = raw;
+        FbsActiveImage.Source = null;
+        if (raw.Length == 0) return;
+        _photos.Load(raw, 110, img =>
+        {
+            if (_activeImageUrl == raw) FbsActiveImage.Source = img;
+        });
     }
 
     private List<JsonMap> ActiveLines()
@@ -879,24 +899,24 @@ public partial class MainWindow : Window
         var lines = FilteredLines();
         var (visible, page) = Paging.Slice(lines, _fbsLinesPage);
         _fbsLinesPage = page;
-        FbsLinesGrid.ItemsSource = visible.Select(line =>
+        _fbsLineRows.Clear();
+        foreach (var line in visible)
         {
-            var url = line.Str("image_url");
             var sku = line.Str("sku");
             var name = line.Str("product_name");
             var order = line.Str("order_display", line.Str("order_id"));
-            return new FbsLineRow
+            var row = new FbsLineRow
             {
                 Id = line.Int("id"),
                 Seq = line.Str("seq"),
-                Photo = url.Length > 0 ? Thumb(url, 32) : null,
                 Sku = sku,
                 Name = name,
                 Order = order,
                 Status = Paging.LineStatusRu(line.Str("status")),
-                Tip = string.Join(" · ", new[] { sku, name, order }.Where(s => s.Length > 0)),
             };
-        }).ToList();
+            _fbsLineRows.Add(row);
+            _photos.Load(line.Str("image_url"), 34, img => row.Photo = img);
+        }
         FbsLinesPageLabel.Text = Paging.RangeLabel(lines.Count, _fbsLinesPage);
         FbsLinesPrev.IsEnabled = _fbsLinesPage > 0;
         FbsLinesNext.IsEnabled = _fbsLinesPage + 1 < Paging.PageCount(lines.Count);
@@ -927,17 +947,46 @@ public partial class MainWindow : Window
         _fbsSearchTimer.Start();
     }
 
-    private void UpdateFbsCacheHint()
+    private void InvalidateCacheHint()
+    {
+        _cacheHintJobId = 0;
+        UpdateFbsCacheHint();
+    }
+
+    /// Counting cached labels touches one file per line, so it runs off the UI
+    /// thread and only when the job (or the cache) actually changed.
+    private async void UpdateFbsCacheHint()
     {
         var job = _fbsJob;
         var jid = job?.IntOrNull("id");
+        if (jid is null)
+        {
+            FbsCacheHint.Text = "";
+            _cacheHintJobId = 0;
+            _cachedLabelsHave = _cachedLabelsTotal = 0;
+            return;
+        }
+        var jobId = jid.Value;
+        if (_cacheHintJobId == jobId) return;
+        _cacheHintJobId = jobId;
         var ids = LabelCache.JobLineIds(job);
-        if (jid is null || ids.Count == 0) { FbsCacheHint.Text = ""; return; }
-        var (have, total) = LabelCache.CachedCount(jid.Value, ids);
-        FbsCacheHint.Text = have >= total ? $"Ярлыки: {have}/{total} на диске"
-            : have > 0 ? $"Ярлыки: {have}/{total} на диске" : "Ярлыки не скачаны";
+        if (ids.Count == 0)
+        {
+            FbsCacheHint.Text = "";
+            _cachedLabelsHave = _cachedLabelsTotal = 0;
+            return;
+        }
+        int have, total;
+        try { (have, total) = await Task.Run(() => LabelCache.CachedCount(jobId, ids)); }
+        catch { return; }
+        if (_cacheHintJobId != jobId) return;
+        _cachedLabelsHave = have;
+        _cachedLabelsTotal = total;
+        FbsCacheHint.Text = have > 0 ? $"Ярлыки: {have}/{total} на диске" : "Ярлыки не скачаны";
         FbsCacheHint.Foreground = have >= total ? Brushes.DarkGreen : have > 0 ? Brushes.DarkOrange : Brushes.Firebrick;
     }
+
+    private bool LabelsCached => _cachedLabelsTotal > 0 && _cachedLabelsHave >= _cachedLabelsTotal;
 
     private void OnFbsManualToggle(object sender, RoutedEventArgs e)
     {
@@ -957,27 +1006,26 @@ public partial class MainWindow : Window
     {
         var groups = _fbsJob?.Arr("remaining_groups") ?? [];
         var query = FbsLinesSearch.Text.Trim();
-        var rows = new List<RemainingRow>();
+        _remainingRows.Clear();
         for (var i = 0; i < groups.Count; i++)
         {
             var g = groups[i];
             if (query.Length > 0 && !Paging.RemainingMatches(g, query)) continue;
-            var url = g.Str("image_url");
-            rows.Add(new RemainingRow
+            var row = new RemainingRow
             {
                 Index = i,
-                Photo = url.Length > 0 ? Thumb(url, 32) : null,
                 Sku = g.Str("sku"),
                 Name = g.Str("name"),
                 Qty = g.Str("quantity"),
                 Barcode = g.Str("barcode"),
-            });
+            };
+            _remainingRows.Add(row);
+            _photos.Load(g.Str("image_url"), 34, img => row.Photo = img);
         }
-        FbsRemainingGrid.ItemsSource = rows;
-        if (rows.Count > 0)
+        if (_remainingRows.Count > 0)
         {
             FbsRemainingGrid.SelectedIndex = 0;
-            OnRemainingSelected(this, new SelectionChangedEventArgs(DataGrid.SelectionChangedEvent, new List<object>(), new List<object>()));
+            SyncSelectedGroup();
         }
         else
         {
@@ -986,7 +1034,9 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnRemainingSelected(object sender, SelectionChangedEventArgs e)
+    private void OnRemainingSelected(object sender, SelectionChangedEventArgs e) => SyncSelectedGroup();
+
+    private void SyncSelectedGroup()
     {
         if (FbsRemainingGrid.SelectedItem is not RemainingRow row || _fbsJob is null)
         {
@@ -1013,7 +1063,7 @@ public partial class MainWindow : Window
             using var bmp = BarcodeLabel.RenderCode128(code, 170, 70);
             using var ms = new MemoryStream();
             bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
-            FbsBarcodeImage.Source = BytesToImage(ms.ToArray());
+            FbsBarcodeImage.Source = PhotoLoader.Decode(ms.ToArray());
         }
         catch { FbsBarcodeImage.Source = null; }
     }
@@ -1025,7 +1075,7 @@ public partial class MainWindow : Window
         var sku = _selectedGroup.Str("sku");
         var pid = _selectedGroup.IntOrNull("product_id");
         await HandleAllocateAsync(
-            () => _client.FbsPickSkuAsync(jobId, sku, pid, FbsBatchBox.IsChecked == true, !LabelCache.JobReady(_fbsJob), FbsSkipMpBox.IsChecked == true),
+            () => _client.FbsPickSkuAsync(jobId, sku, pid, FbsBatchBox.IsChecked == true, !LabelsCached, FbsSkipMpBox.IsChecked == true),
             "Выделение SKU...",
             sku.ToLowerInvariant());
     }
@@ -1075,7 +1125,7 @@ public partial class MainWindow : Window
             return;
         }
         await HandleAllocateAsync(
-            () => _client.FbsScanProductAsync(jobId, code, FbsBatchBox.IsChecked == true, !LabelCache.JobReady(_fbsJob), FbsSkipMpBox.IsChecked == true),
+            () => _client.FbsScanProductAsync(jobId, code, FbsBatchBox.IsChecked == true, !LabelsCached, FbsSkipMpBox.IsChecked == true),
             "Пик товара...",
             scanKey);
     }
@@ -1160,11 +1210,7 @@ public partial class MainWindow : Window
         var jobId = job.Int("id");
         if (jobId == 0) return;
         if (_prefetchJobId == jobId && !interactive) return;
-        if (LabelCache.JobReady(job) && !interactive)
-        {
-            UpdateFbsCacheHint();
-            return;
-        }
+        if (!interactive && _cacheHintJobId == jobId && LabelsCached) return;
         if (interactive)
         {
             if (_fbsBusy) return;
@@ -1175,8 +1221,8 @@ public partial class MainWindow : Window
         try
         {
             var zip = await _client.FbsDownloadLineLabelsZipAsync(jobId);
-            var saved = LabelCache.SaveZip(jobId, zip);
-            UpdateFbsCacheHint();
+            var saved = await Task.Run(() => LabelCache.SaveZip(jobId, zip));
+            InvalidateCacheHint();
             SetStatus($"Ярлыки сохранены локально: {saved}");
             if (interactive) FocusScan();
         }
@@ -1292,29 +1338,39 @@ public partial class MainWindow : Window
         }, status);
     }
 
-    private async void OnFbsLineContext(object sender, MouseButtonEventArgs e)
+    private JsonMap? SelectedLine()
     {
-        if (FbsLinesGrid.SelectedItem is not FbsLineRow row || _fbsJob is null) return;
-        var line = _fbsJob.Arr("lines").FirstOrDefault(l => l.Int("id") == row.Id);
-        if (line is null) return;
-        var status = line.Str("status");
-        var menu = new ContextMenu();
-        var item = new MenuItem { Header = status is "printed" or "done" ? "Статус: в сборке" : "Статус: готово" };
-        var next = status is "printed" or "done" ? "pending" : "done";
-        item.Click += async (_, _) =>
+        if (FbsLinesGrid.SelectedItem is not FbsLineRow row || _fbsJob is null) return null;
+        return _fbsJob.Arr("lines").FirstOrDefault(l => l.Int("id") == row.Id);
+    }
+
+    private void OnFbsLinesContextOpening(object sender, ContextMenuEventArgs e)
+    {
+        var line = SelectedLine();
+        if (line is null || FbsLinesGrid.ContextMenu?.Items.Count is not > 0)
         {
-            if (!RequireApi()) return;
-            await FbsRunAsync(async () =>
-            {
-                var payload = await _client.FbsSetLineStatusAsync(_fbsJob.Int("id"), row.Id, next);
-                _fbsJob = payload.Obj("job") ?? _fbsJob;
-                RenderFbsJob();
-                SetStatus($"Статус строки: {Paging.LineStatusRu(next)}");
-                FocusScan();
-            }, "Смена статуса...");
-        };
-        menu.Items.Add(item);
-        menu.IsOpen = true;
+            e.Handled = true;
+            return;
+        }
+        if (FbsLinesGrid.ContextMenu.Items[0] is MenuItem item)
+            item.Header = line.Str("status") is "printed" or "done" ? "Статус: в сборке" : "Статус: готово";
+    }
+
+    private async void OnFbsLineStatusToggle(object sender, RoutedEventArgs e)
+    {
+        var line = SelectedLine();
+        if (line is null || _fbsJob is null) return;
+        if (!RequireApi()) return;
+        var lineId = line.Int("id");
+        var next = line.Str("status") is "printed" or "done" ? "pending" : "done";
+        await FbsRunAsync(async () =>
+        {
+            var payload = await _client.FbsSetLineStatusAsync(_fbsJob.Int("id"), lineId, next);
+            _fbsJob = payload.Obj("job") ?? _fbsJob;
+            RenderFbsJob();
+            SetStatus($"Статус строки: {Paging.LineStatusRu(next)}");
+            FocusScan();
+        }, "Смена статуса...");
     }
 
     private async Task FbsRunAsync(Func<Task> work, string status)
@@ -1329,6 +1385,7 @@ public partial class MainWindow : Window
 
     private void ShowFbsError(Exception ex)
     {
+        if (ex is OperationCanceledException) return;
         if (ex is AuthException) { ShowError(ex); return; }
         if (ex is ApiException)
         {

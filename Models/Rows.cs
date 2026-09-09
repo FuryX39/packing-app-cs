@@ -1,6 +1,29 @@
+using System.ComponentModel;
 using System.Windows.Media;
 
 namespace WarehousePacking.Models;
+
+/// Row whose thumbnail arrives later, so the grid updates the cell in place
+/// instead of being rebuilt from scratch.
+public abstract class PhotoRow : INotifyPropertyChanged
+{
+    private static readonly PropertyChangedEventArgs PhotoArgs = new(nameof(Photo));
+    private ImageSource? _photo;
+
+    public ImageSource? Photo
+    {
+        get => _photo;
+        set
+        {
+            if (ReferenceEquals(_photo, value))
+                return;
+            _photo = value;
+            PropertyChanged?.Invoke(this, PhotoArgs);
+        }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+}
 
 public sealed class TaskRow
 {
@@ -18,10 +41,9 @@ public sealed class AttachmentRow
     public string Filename { get; init; } = "";
 }
 
-public sealed class CatalogRow
+public sealed class CatalogRow : PhotoRow
 {
     public int Id { get; init; }
-    public ImageSource? Photo { get; set; }
     public string Sku { get; init; } = "";
     public string Name { get; init; } = "";
 }
@@ -33,22 +55,19 @@ public sealed class FbsJobRow
     public string Progress { get; init; } = "";
 }
 
-public sealed class FbsLineRow
+public sealed class FbsLineRow : PhotoRow
 {
     public int Id { get; init; }
     public string Seq { get; init; } = "";
-    public ImageSource? Photo { get; set; }
     public string Sku { get; init; } = "";
     public string Name { get; init; } = "";
     public string Order { get; init; } = "";
     public string Status { get; init; } = "";
-    public string Tip { get; init; } = "";
 }
 
-public sealed class RemainingRow
+public sealed class RemainingRow : PhotoRow
 {
     public int Index { get; init; }
-    public ImageSource? Photo { get; set; }
     public string Sku { get; init; } = "";
     public string Name { get; init; } = "";
     public string Qty { get; init; } = "";

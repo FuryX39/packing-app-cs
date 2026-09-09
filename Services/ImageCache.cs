@@ -33,22 +33,6 @@ public static class ImageCache
         catch { return null; }
     }
 
-    public static bool BeginFetch(string url)
-    {
-        var raw = (url ?? "").Trim();
-        if (!raw.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
-            !raw.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            return false;
-        if (GetCached(raw) != null)
-            return false;
-        lock (Gate)
-        {
-            if (!Inflight.Add(raw))
-                return false;
-        }
-        return true;
-    }
-
     public static async Task<byte[]?> FetchAsync(string url)
     {
         var raw = (url ?? "").Trim();
@@ -58,6 +42,11 @@ public static class ImageCache
         if (!raw.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
             !raw.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             return null;
+        lock (Gate)
+        {
+            if (!Inflight.Add(raw))
+                return null;
+        }
         try
         {
             using var req = new HttpRequestMessage(HttpMethod.Get, raw);

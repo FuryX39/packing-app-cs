@@ -5,6 +5,100 @@
         Height="720" Width="1100"
         WindowStartupLocation="CenterScreen"
         Closing="OnClosing">
+    <Window.Resources>
+        <Style x:Key="FlatCell" TargetType="DataGridCell">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#1B1B1B"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="Foreground" Value="#1B1B1B"/>
+                    <Setter Property="BorderThickness" Value="0"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="FlatRow" TargetType="DataGridRow">
+            <Setter Property="Background" Value="Transparent"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#F0F6FB"/>
+                </Trigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#CFE5F7"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="TaskRowStyle" TargetType="DataGridRow" BasedOn="{StaticResource FlatRow}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Tag}" Value="today">
+                    <Setter Property="Background" Value="#FFE0E3"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Tag}" Value="tomorrow">
+                    <Setter Property="Background" Value="#FFF6D0"/>
+                </DataTrigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#CFE5F7"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="CellText" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+
+        <!-- Names get trimmed in narrow columns, so keep the full text on hover. -->
+        <Style x:Key="CellTextTip" TargetType="TextBlock" BasedOn="{StaticResource CellText}">
+            <Setter Property="ToolTip" Value="{Binding Name}"/>
+        </Style>
+
+        <Style x:Key="RowHeader" TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#F5F5F5"/>
+            <Setter Property="Foreground" Value="#444"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="BorderBrush" Value="#DDD"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        </Style>
+
+        <!-- Rows are separated by a single horizontal rule; cells have no borders. -->
+        <Style x:Key="RowLinesGrid" TargetType="DataGrid">
+            <Setter Property="AutoGenerateColumns" Value="False"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="CanUserAddRows" Value="False"/>
+            <Setter Property="CanUserDeleteRows" Value="False"/>
+            <Setter Property="CanUserResizeRows" Value="False"/>
+            <Setter Property="CanUserResizeColumns" Value="True"/>
+            <Setter Property="CanUserSortColumns" Value="False"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
+            <Setter Property="SelectionMode" Value="Single"/>
+            <Setter Property="SelectionUnit" Value="FullRow"/>
+            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="#E4E4E4"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="RowBackground" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="#DDD"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="RowHeight" Value="36"/>
+            <Setter Property="CellStyle" Value="{StaticResource FlatCell}"/>
+            <Setter Property="RowStyle" Value="{StaticResource FlatRow}"/>
+            <Setter Property="ColumnHeaderStyle" Value="{StaticResource RowHeader}"/>
+            <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/>
+            <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
+        </Style>
+
+        <Style x:Key="CellButton" TargetType="Button">
+            <Setter Property="Padding" Value="10,3"/>
+            <Setter Property="Margin" Value="0,3"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+    </Window.Resources>
+
     <DockPanel>
         <StatusBar DockPanel.Dock="Bottom">
             <TextBlock x:Name="StatusText" Text="Готово"/>
@@ -32,26 +126,13 @@
                         </Grid.ColumnDefinitions>
                         <DockPanel>
                             <TextBlock DockPanel.Dock="Top" Text="Мои задания" Margin="0,0,0,4"/>
-                            <DataGrid x:Name="TasksGrid" AutoGenerateColumns="False" IsReadOnly="True"
-                                      SelectionMode="Single" HeadersVisibility="Column"
-                                      CanUserAddRows="False" GridLinesVisibility="Horizontal"
+                            <DataGrid x:Name="TasksGrid" Style="{StaticResource RowLinesGrid}"
+                                      RowStyle="{StaticResource TaskRowStyle}"
                                       SelectionChanged="OnTaskSelected">
-                                <DataGrid.RowStyle>
-                                    <Style TargetType="DataGridRow">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding Tag}" Value="today">
-                                                <Setter Property="Background" Value="#FFCDD2"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Tag}" Value="tomorrow">
-                                                <Setter Property="Background" Value="#FFF9C4"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </DataGrid.RowStyle>
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Дата сборки" Binding="{Binding Assembly}" Width="110"/>
-                                    <DataGridTextColumn Header="Маркетплейс" Binding="{Binding Marketplace}" Width="*"/>
-                                    <DataGridTextColumn Header="Дата отгрузки" Binding="{Binding Ship}" Width="110"/>
+                                    <DataGridTextColumn Header="Дата сборки" Binding="{Binding Assembly}" Width="110" ElementStyle="{StaticResource CellText}"/>
+                                    <DataGridTextColumn Header="Маркетплейс" Binding="{Binding Marketplace}" Width="*" ElementStyle="{StaticResource CellText}"/>
+                                    <DataGridTextColumn Header="Дата отгрузки" Binding="{Binding Ship}" Width="110" ElementStyle="{StaticResource CellText}"/>
                                 </DataGrid.Columns>
                             </DataGrid>
                         </DockPanel>
@@ -63,13 +144,18 @@
                                 <ComboBox x:Name="TaskStatusBox" Width="220" Margin="8,0,0,0" SelectionChanged="OnTaskStatusChanged"/>
                             </StackPanel>
                             <GroupBox Header="Файлы для печати" DockPanel.Dock="Bottom" Height="200" Padding="6">
-                                <DataGrid x:Name="FilesGrid" AutoGenerateColumns="False" IsReadOnly="True"
-                                          CanUserAddRows="False" HeadersVisibility="Column"
-                                          MouseLeftButtonUp="OnFilePrintClick">
+                                <DataGrid x:Name="FilesGrid" Style="{StaticResource RowLinesGrid}">
                                     <DataGrid.Columns>
-                                        <DataGridTextColumn Header="Тип" Binding="{Binding Kind}" Width="90"/>
-                                        <DataGridTextColumn Header="Файл" Binding="{Binding Filename}" Width="*"/>
-                                        <DataGridTextColumn Header="" Binding="{Binding ., StringFormat=Печать}" Width="80"/>
+                                        <DataGridTextColumn Header="Тип" Binding="{Binding Kind}" Width="90" ElementStyle="{StaticResource CellText}"/>
+                                        <DataGridTextColumn Header="Файл" Binding="{Binding Filename}" Width="*" ElementStyle="{StaticResource CellText}"/>
+                                        <DataGridTemplateColumn Header="" Width="100" CanUserResize="False">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Content="Печать" Style="{StaticResource CellButton}"
+                                                            Tag="{Binding Id}" Click="OnPrintAttachmentButton"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
                                     </DataGrid.Columns>
                                 </DataGrid>
                             </GroupBox>
@@ -89,7 +175,7 @@
                     </DockPanel>
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="240" MinWidth="200"/>
+                            <ColumnDefinition Width="260" MinWidth="200"/>
                             <ColumnDefinition Width="6"/>
                             <ColumnDefinition Width="*" MinWidth="480"/>
                         </Grid.ColumnDefinitions>
@@ -100,13 +186,12 @@
                                 <TextBlock x:Name="FbsJobsPageLabel" VerticalAlignment="Center" Margin="8,0"/>
                                 <Button Content="Вперёд" Click="OnFbsJobsNext" x:Name="FbsJobsNext"/>
                             </StackPanel>
-                            <DataGrid x:Name="FbsJobsGrid" AutoGenerateColumns="False" IsReadOnly="True"
-                                      SelectionMode="Single" CanUserAddRows="False" HeadersVisibility="Column"
+                            <DataGrid x:Name="FbsJobsGrid" Style="{StaticResource RowLinesGrid}"
                                       SelectionChanged="OnFbsJobSelected">
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="№" Binding="{Binding Id}" Width="44"/>
-                                    <DataGridTextColumn Header="Статус" Binding="{Binding Status}" Width="*"/>
-                                    <DataGridTextColumn Header="Готово" Binding="{Binding Progress}" Width="64"/>
+                                    <DataGridTextColumn Header="№" Binding="{Binding Id}" Width="52" ElementStyle="{StaticResource CellText}"/>
+                                    <DataGridTextColumn Header="Статус" Binding="{Binding Status}" Width="*" ElementStyle="{StaticResource CellText}"/>
+                                    <DataGridTextColumn Header="Готово" Binding="{Binding Progress}" Width="72" ElementStyle="{StaticResource CellText}"/>
                                 </DataGrid.Columns>
                             </DataGrid>
                         </DockPanel>
@@ -147,21 +232,21 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="200"/>
                                     </Grid.ColumnDefinitions>
-                                    <DataGrid x:Name="FbsRemainingGrid" AutoGenerateColumns="False" IsReadOnly="True"
-                                              CanUserAddRows="False" SelectionChanged="OnRemainingSelected"
+                                    <DataGrid x:Name="FbsRemainingGrid" Style="{StaticResource RowLinesGrid}"
+                                              SelectionChanged="OnRemainingSelected"
                                               MouseDoubleClick="OnRemainingPick">
                                         <DataGrid.Columns>
-                                            <DataGridTemplateColumn Header="Фото" Width="44">
+                                            <DataGridTemplateColumn Header="Фото" Width="48" CanUserResize="False">
                                                 <DataGridTemplateColumn.CellTemplate>
                                                     <DataTemplate>
-                                                        <Image Source="{Binding Photo}" Width="32" Height="32"/>
+                                                        <Image Source="{Binding Photo}" Width="30" Height="30" Stretch="Uniform"/>
                                                     </DataTemplate>
                                                 </DataGridTemplateColumn.CellTemplate>
                                             </DataGridTemplateColumn>
-                                            <DataGridTextColumn Header="Артикул" Binding="{Binding Sku}" Width="90"/>
-                                            <DataGridTextColumn Header="Название" Binding="{Binding Name}" Width="*"/>
-                                            <DataGridTextColumn Header="Ост." Binding="{Binding Qty}" Width="46"/>
-                                            <DataGridTextColumn Header="ШК" Binding="{Binding Barcode}" Width="110"/>
+                                            <DataGridTextColumn Header="Артикул" Binding="{Binding Sku}" Width="100" ElementStyle="{StaticResource CellText}"/>
+                                            <DataGridTextColumn Header="Название" Binding="{Binding Name}" Width="*" ElementStyle="{StaticResource CellTextTip}"/>
+                                            <DataGridTextColumn Header="Ост." Binding="{Binding Qty}" Width="52" ElementStyle="{StaticResource CellText}"/>
+                                            <DataGridTextColumn Header="ШК" Binding="{Binding Barcode}" Width="120" ElementStyle="{StaticResource CellText}"/>
                                         </DataGrid.Columns>
                                     </DataGrid>
                                     <StackPanel Grid.Column="1" Margin="10,0,0,0">
@@ -185,21 +270,27 @@
                                         <TextBlock x:Name="FbsLinesPageLabel" VerticalAlignment="Center" Margin="8,0"/>
                                         <Button Content="Вперёд" Click="OnFbsLinesNext" x:Name="FbsLinesNext"/>
                                     </StackPanel>
-                                    <DataGrid x:Name="FbsLinesGrid" AutoGenerateColumns="False" IsReadOnly="True"
-                                              CanUserAddRows="False" MouseRightButtonUp="OnFbsLineContext">
+                                    <DataGrid x:Name="FbsLinesGrid" Style="{StaticResource RowLinesGrid}"
+                                              PreviewMouseRightButtonDown="OnGridRightButtonDown"
+                                              ContextMenuOpening="OnFbsLinesContextOpening">
+                                        <DataGrid.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Статус: готово" Click="OnFbsLineStatusToggle"/>
+                                            </ContextMenu>
+                                        </DataGrid.ContextMenu>
                                         <DataGrid.Columns>
-                                            <DataGridTextColumn Header="№" Binding="{Binding Seq}" Width="40"/>
-                                            <DataGridTemplateColumn Header="Фото" Width="44">
+                                            <DataGridTextColumn Header="№" Binding="{Binding Seq}" Width="44" ElementStyle="{StaticResource CellText}"/>
+                                            <DataGridTemplateColumn Header="Фото" Width="48" CanUserResize="False">
                                                 <DataGridTemplateColumn.CellTemplate>
                                                     <DataTemplate>
-                                                        <Image Source="{Binding Photo}" Width="32" Height="32"/>
+                                                        <Image Source="{Binding Photo}" Width="30" Height="30" Stretch="Uniform"/>
                                                     </DataTemplate>
                                                 </DataGridTemplateColumn.CellTemplate>
                                             </DataGridTemplateColumn>
-                                            <DataGridTextColumn Header="Артикул" Binding="{Binding Sku}" Width="90"/>
-                                            <DataGridTextColumn Header="Название" Binding="{Binding Name}" Width="*"/>
-                                            <DataGridTextColumn Header="Заказ" Binding="{Binding Order}" Width="120"/>
-                                            <DataGridTextColumn Header="Статус" Binding="{Binding Status}" Width="90"/>
+                                            <DataGridTextColumn Header="Артикул" Binding="{Binding Sku}" Width="100" ElementStyle="{StaticResource CellText}"/>
+                                            <DataGridTextColumn Header="Название" Binding="{Binding Name}" Width="*" ElementStyle="{StaticResource CellTextTip}"/>
+                                            <DataGridTextColumn Header="Заказ" Binding="{Binding Order}" Width="130" ElementStyle="{StaticResource CellText}"/>
+                                            <DataGridTextColumn Header="Статус" Binding="{Binding Status}" Width="100" ElementStyle="{StaticResource CellText}"/>
                                         </DataGrid.Columns>
                                     </DataGrid>
                                 </DockPanel>
@@ -226,24 +317,32 @@
                         <TextBlock x:Name="CatalogPageLabel" VerticalAlignment="Center" Margin="8,0"/>
                         <Button Content="Вперёд" Click="OnCatalogNext" x:Name="CatalogNext"/>
                     </StackPanel>
-                    <DataGrid x:Name="CatalogGrid" AutoGenerateColumns="False" IsReadOnly="True"
-                              CanUserAddRows="False" MouseLeftButtonUp="OnCatalogPrintClick"
-                              MouseRightButtonUp="OnCatalogContext">
+                    <DataGrid x:Name="CatalogGrid" Style="{StaticResource RowLinesGrid}" RowHeight="44"
+                              PreviewMouseRightButtonDown="OnGridRightButtonDown">
+                        <DataGrid.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Печать ШК" Click="OnCatalogPrintMenu"/>
+                                <MenuItem Header="Добавить ШК" Click="OnCatalogAddBarcodeMenu"/>
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
                         <DataGrid.Columns>
-                            <DataGridTemplateColumn Header="Фото" Width="52">
+                            <DataGridTemplateColumn Header="Фото" Width="56" CanUserResize="False">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <Image Source="{Binding Photo}" Width="32" Height="32"/>
+                                        <Image Source="{Binding Photo}" Width="36" Height="36" Stretch="Uniform"/>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="Артикул" Binding="{Binding Sku}" Width="120"/>
-                            <DataGridTextColumn Header="Название" Binding="{Binding Name}" Width="*"/>
-                            <DataGridTextColumn Header="Печать ШК" Width="110">
-                                <DataGridTextColumn.Binding>
-                                    <Binding StringFormat="Печать ШК"/>
-                                </DataGridTextColumn.Binding>
-                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Артикул" Binding="{Binding Sku}" Width="140" ElementStyle="{StaticResource CellText}"/>
+                            <DataGridTextColumn Header="Название" Binding="{Binding Name}" Width="*" ElementStyle="{StaticResource CellTextTip}"/>
+                            <DataGridTemplateColumn Header="" Width="130" CanUserResize="False">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="Печать ШК" Style="{StaticResource CellButton}"
+                                                Tag="{Binding Id}" Click="OnCatalogPrintButton"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                         </DataGrid.Columns>
                     </DataGrid>
                 </DockPanel>

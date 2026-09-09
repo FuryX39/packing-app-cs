@@ -261,7 +261,14 @@ public sealed class ApiClient : IDisposable
         var req = new HttpRequestMessage(new HttpMethod(method), url);
         if (body != null)
             req.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
-        return await client.SendAsync(req, cts.Token);
+        try
+        {
+            return await client.SendAsync(req, cts.Token);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            throw new ApiException($"Сервер не ответил за {timeoutSec} с: {url}", 408);
+        }
     }
 
     private static void Raise(HttpResponseMessage resp, string text)
