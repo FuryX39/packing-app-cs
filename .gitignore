@@ -1,0 +1,16 @@
+bin/
+obj/
+publish/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.cache
+config.env
+cache/
+smoke/
+*.log
+*.pdb
+Thumbs.db
+.DS_Store

@@ -1,0 +1,253 @@
+<Window x:Class="WarehousePacking.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Warehouse Packing"
+        Height="720" Width="1100"
+        WindowStartupLocation="CenterScreen"
+        Closing="OnClosing">
+    <DockPanel>
+        <StatusBar DockPanel.Dock="Bottom">
+            <TextBlock x:Name="StatusText" Text="Готово"/>
+        </StatusBar>
+        <DockPanel DockPanel.Dock="Top" Margin="10,10,10,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Настройки" Click="OnSettings"/>
+                <Button Content="Выйти" Click="OnLogout"/>
+            </StackPanel>
+        </DockPanel>
+        <TabControl x:Name="Tabs" Margin="10" SelectionChanged="OnTabChanged">
+            <TabItem Header="Задания">
+                <DockPanel Margin="6">
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                        <Button Content="Обновить" Click="OnReloadTasks"/>
+                        <Button Content="Печать все А4" Click="OnPrintAllA4"/>
+                        <Button Content="Печать все этикетки" Click="OnPrintAllLabels"/>
+                        <Button Content="Печать всё" Click="OnPrintAllFiles"/>
+                    </StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.1*"/>
+                            <ColumnDefinition Width="6"/>
+                            <ColumnDefinition Width="2*"/>
+                        </Grid.ColumnDefinitions>
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="Мои задания" Margin="0,0,0,4"/>
+                            <DataGrid x:Name="TasksGrid" AutoGenerateColumns="False" IsReadOnly="True"
+                                      SelectionMode="Single" HeadersVisibility="Column"
+                                      CanUserAddRows="False" GridLinesVisibility="Horizontal"
+                                      SelectionChanged="OnTaskSelected">
+                                <DataGrid.RowStyle>
+                                    <Style TargetType="DataGridRow">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Tag}" Value="today">
+                                                <Setter Property="Background" Value="#FFCDD2"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Tag}" Value="tomorrow">
+                                                <Setter Property="Background" Value="#FFF9C4"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DataGrid.RowStyle>
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Дата сборки" Binding="{Binding Assembly}" Width="110"/>
+                                    <DataGridTextColumn Header="Маркетплейс" Binding="{Binding Marketplace}" Width="*"/>
+                                    <DataGridTextColumn Header="Дата отгрузки" Binding="{Binding Ship}" Width="110"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </DockPanel>
+                        <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Stretch"/>
+                        <DockPanel Grid.Column="2">
+                            <TextBlock DockPanel.Dock="Top" Text="Детали задания"/>
+                            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,6,0,8">
+                                <TextBlock Text="Статус" VerticalAlignment="Center"/>
+                                <ComboBox x:Name="TaskStatusBox" Width="220" Margin="8,0,0,0" SelectionChanged="OnTaskStatusChanged"/>
+                            </StackPanel>
+                            <GroupBox Header="Файлы для печати" DockPanel.Dock="Bottom" Height="200" Padding="6">
+                                <DataGrid x:Name="FilesGrid" AutoGenerateColumns="False" IsReadOnly="True"
+                                          CanUserAddRows="False" HeadersVisibility="Column"
+                                          MouseLeftButtonUp="OnFilePrintClick">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Тип" Binding="{Binding Kind}" Width="90"/>
+                                        <DataGridTextColumn Header="Файл" Binding="{Binding Filename}" Width="*"/>
+                                        <DataGridTextColumn Header="" Binding="{Binding ., StringFormat=Печать}" Width="80"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </GroupBox>
+                            <TextBox x:Name="TaskDescription" IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True"
+                                     VerticalScrollBarVisibility="Auto" Margin="0,0,0,8"/>
+                        </DockPanel>
+                    </Grid>
+                </DockPanel>
+            </TabItem>
+            <TabItem Header="Упаковка FBS">
+                <DockPanel Margin="6">
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <Button DockPanel.Dock="Left" Content="Обновить" Click="OnReloadFbs"/>
+                        <Button DockPanel.Dock="Left" Content="Скачать ярлыки" Click="OnDownloadFbsLabels"/>
+                        <TextBlock x:Name="FbsCacheHint" VerticalAlignment="Center" Margin="12,0,0,0" Foreground="#555"/>
+                        <TextBlock x:Name="FbsApiHint" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                    </DockPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="240" MinWidth="200"/>
+                            <ColumnDefinition Width="6"/>
+                            <ColumnDefinition Width="*" MinWidth="480"/>
+                        </Grid.ColumnDefinitions>
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="Мои задания FBS" Margin="0,0,0,4"/>
+                            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,4,0,0">
+                                <Button Content="Назад" Click="OnFbsJobsPrev" x:Name="FbsJobsPrev"/>
+                                <TextBlock x:Name="FbsJobsPageLabel" VerticalAlignment="Center" Margin="8,0"/>
+                                <Button Content="Вперёд" Click="OnFbsJobsNext" x:Name="FbsJobsNext"/>
+                            </StackPanel>
+                            <DataGrid x:Name="FbsJobsGrid" AutoGenerateColumns="False" IsReadOnly="True"
+                                      SelectionMode="Single" CanUserAddRows="False" HeadersVisibility="Column"
+                                      SelectionChanged="OnFbsJobSelected">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="№" Binding="{Binding Id}" Width="44"/>
+                                    <DataGridTextColumn Header="Статус" Binding="{Binding Status}" Width="*"/>
+                                    <DataGridTextColumn Header="Готово" Binding="{Binding Progress}" Width="64"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </DockPanel>
+                        <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Stretch"/>
+                        <DockPanel Grid.Column="2">
+                            <DockPanel DockPanel.Dock="Top">
+                                <TextBlock x:Name="FbsJobTitle" Text="Выберите задание" FontWeight="SemiBold" FontSize="14"/>
+                                <TextBlock x:Name="FbsJobStats" HorizontalAlignment="Right"/>
+                            </DockPanel>
+                            <GroupBox Header="Активная строка (наклеить ярлык заказа)" DockPanel.Dock="Top" Margin="0,8" Padding="8">
+                                <DockPanel>
+                                    <Border DockPanel.Dock="Left" Width="110" Height="110" Background="#F3F3F3" BorderBrush="#CCC" BorderThickness="1" Margin="0,0,10,0">
+                                        <Image x:Name="FbsActiveImage" Stretch="Uniform"/>
+                                    </Border>
+                                    <StackPanel>
+                                        <TextBlock x:Name="FbsActiveText" Text="Нет активной строки — пикните товар" TextWrapping="Wrap"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                            <Button Content="Перепечатать ярлык" Click="OnFbsReprint"/>
+                                            <Button Content="Отменить печать" Click="OnFbsCancelPrint"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </DockPanel>
+                            </GroupBox>
+                            <TextBlock x:Name="FbsCisHint" DockPanel.Dock="Top" Foreground="#A33" TextWrapping="Wrap" Margin="0,0,0,4"/>
+                            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                                <TextBlock Text="Сканер" VerticalAlignment="Center"/>
+                                <Button DockPanel.Dock="Right" Content="OK" Click="OnFbsScan"/>
+                                <TextBox x:Name="FbsScanBox" Margin="8,0" KeyDown="OnFbsScanKey"/>
+                            </DockPanel>
+                            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,4">
+                                <CheckBox x:Name="FbsManualBox" Content="Ручная сборка (остаток + ШК с экрана)" Click="OnFbsManualToggle"/>
+                                <CheckBox x:Name="FbsBatchBox" Content="Печатать все ярлыки SKU сразу" Margin="16,0,0,0"/>
+                                <CheckBox x:Name="FbsSkipMpBox" Content="Без подтверждения ШК с МП" Margin="16,0,0,0" Click="OnFbsSkipMpToggle"/>
+                            </StackPanel>
+                            <GroupBox x:Name="FbsManualPanel" Header="Остаток к сборке" DockPanel.Dock="Top" Height="220" Margin="0,0,0,8" Visibility="Collapsed">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="200"/>
+                                    </Grid.ColumnDefinitions>
+                                    <DataGrid x:Name="FbsRemainingGrid" AutoGenerateColumns="False" IsReadOnly="True"
+                                              CanUserAddRows="False" SelectionChanged="OnRemainingSelected"
+                                              MouseDoubleClick="OnRemainingPick">
+                                        <DataGrid.Columns>
+                                            <DataGridTemplateColumn Header="Фото" Width="44">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <Image Source="{Binding Photo}" Width="32" Height="32"/>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                            <DataGridTextColumn Header="Артикул" Binding="{Binding Sku}" Width="90"/>
+                                            <DataGridTextColumn Header="Название" Binding="{Binding Name}" Width="*"/>
+                                            <DataGridTextColumn Header="Ост." Binding="{Binding Qty}" Width="46"/>
+                                            <DataGridTextColumn Header="ШК" Binding="{Binding Barcode}" Width="110"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                    <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                        <TextBlock Text="ШК для сканера"/>
+                                        <Border Width="180" Height="80" Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="0,6">
+                                            <Image x:Name="FbsBarcodeImage" Stretch="Uniform"/>
+                                        </Border>
+                                        <Button Content="Взять (тап)" Click="OnRemainingPick"/>
+                                    </StackPanel>
+                                </Grid>
+                            </GroupBox>
+                            <GroupBox Header="Строки задания" Padding="6">
+                                <DockPanel>
+                                    <DockPanel DockPanel.Dock="Bottom" Margin="0,4,0,0">
+                                        <TextBlock Text="Поиск в задании" VerticalAlignment="Center"/>
+                                        <Button DockPanel.Dock="Right" Content="Найти" Click="OnFbsLinesSearch"/>
+                                        <TextBox x:Name="FbsLinesSearch" Margin="8,0" KeyUp="OnFbsLinesSearchKey"/>
+                                    </DockPanel>
+                                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,4,0,0">
+                                        <Button Content="Назад" Click="OnFbsLinesPrev" x:Name="FbsLinesPrev"/>
+                                        <TextBlock x:Name="FbsLinesPageLabel" VerticalAlignment="Center" Margin="8,0"/>
+                                        <Button Content="Вперёд" Click="OnFbsLinesNext" x:Name="FbsLinesNext"/>
+                                    </StackPanel>
+                                    <DataGrid x:Name="FbsLinesGrid" AutoGenerateColumns="False" IsReadOnly="True"
+                                              CanUserAddRows="False" MouseRightButtonUp="OnFbsLineContext">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="№" Binding="{Binding Seq}" Width="40"/>
+                                            <DataGridTemplateColumn Header="Фото" Width="44">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <Image Source="{Binding Photo}" Width="32" Height="32"/>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                            <DataGridTextColumn Header="Артикул" Binding="{Binding Sku}" Width="90"/>
+                                            <DataGridTextColumn Header="Название" Binding="{Binding Name}" Width="*"/>
+                                            <DataGridTextColumn Header="Заказ" Binding="{Binding Order}" Width="120"/>
+                                            <DataGridTextColumn Header="Статус" Binding="{Binding Status}" Width="90"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </DockPanel>
+                            </GroupBox>
+                        </DockPanel>
+                    </Grid>
+                </DockPanel>
+            </TabItem>
+            <TabItem Header="Номенклатура">
+                <DockPanel Margin="6">
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                        <TextBlock Text="Кол-во этикеток" VerticalAlignment="Center"/>
+                        <TextBox x:Name="CatalogQtyBox" Width="60" Text="1" Margin="8,0"/>
+                        <TextBlock Text="для кнопки «Печать ШК»" Foreground="#666" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <TextBlock Text="Поиск" VerticalAlignment="Center"/>
+                        <Button DockPanel.Dock="Right" Content="Обновить" Click="OnCatalogReload"/>
+                        <Button DockPanel.Dock="Right" Content="Найти" Click="OnCatalogSearch"/>
+                        <TextBox x:Name="CatalogSearchBox" Margin="8,0" KeyUp="OnCatalogSearchKey"/>
+                    </DockPanel>
+                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,6,0,0">
+                        <Button Content="Назад" Click="OnCatalogPrev" x:Name="CatalogPrev"/>
+                        <TextBlock x:Name="CatalogPageLabel" VerticalAlignment="Center" Margin="8,0"/>
+                        <Button Content="Вперёд" Click="OnCatalogNext" x:Name="CatalogNext"/>
+                    </StackPanel>
+                    <DataGrid x:Name="CatalogGrid" AutoGenerateColumns="False" IsReadOnly="True"
+                              CanUserAddRows="False" MouseLeftButtonUp="OnCatalogPrintClick"
+                              MouseRightButtonUp="OnCatalogContext">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="Фото" Width="52">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Image Source="{Binding Photo}" Width="32" Height="32"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="Артикул" Binding="{Binding Sku}" Width="120"/>
+                            <DataGridTextColumn Header="Название" Binding="{Binding Name}" Width="*"/>
+                            <DataGridTextColumn Header="Печать ШК" Width="110">
+                                <DataGridTextColumn.Binding>
+                                    <Binding StringFormat="Печать ШК"/>
+                                </DataGridTextColumn.Binding>
+                            </DataGridTextColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
+</Window>
