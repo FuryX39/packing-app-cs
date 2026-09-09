@@ -43,7 +43,6 @@ public partial class MainWindow : Window
     private string _lastScanCode = "";
     private string _lastScanSku = "";
     private List<int> _lastScanLineIds = [];
-    private int? _prefetchJobId;
     private DispatcherTimer? _fbsSearchTimer;
 
     private readonly PhotoLoader _photos;
@@ -55,7 +54,8 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<RemainingRow> _remainingRows = [];
 
     private CancellationTokenSource? _fbsOpenCts;
-    private readonly DispatcherTimer _prefetchTimer = new() { Interval = TimeSpan.FromMilliseconds(1200) };
+    private readonly DispatcherTimer _fbsSelectTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
+    private int _fbsPendingJobId;
     private int _cacheHintJobId;
     private int _cachedLabelsHave;
     private int _cachedLabelsTotal;
@@ -85,11 +85,11 @@ public partial class MainWindow : Window
             if (Tabs.SelectedIndex == 0)
                 _ = LoadTasksAsync(true);
         };
-        _prefetchTimer.Tick += (_, _) =>
+        _fbsSelectTimer.Tick += (_, _) =>
         {
-            _prefetchTimer.Stop();
-            if (_fbsJob is not null)
-                _ = PrefetchLabelsAsync(_fbsJob, false);
+            _fbsSelectTimer.Stop();
+            if (_fbsPendingJobId > 0)
+                _ = OpenFbsJobAsync(_fbsPendingJobId);
         };
         Loaded += async (_, _) => await LoadTasksAsync(false);
     }
@@ -99,7 +99,7 @@ public partial class MainWindow : Window
     private async void OnClosing(object sender, System.ComponentModel.CancelEventArgs e)
     {
         _tasksTimer.Stop();
-        _prefetchTimer.Stop();
+        _fbsSelectTimer.Stop();
         _fbsOpenCts?.Cancel();
         await _client.LogoutAsync();
         _client.Dispose();
@@ -377,8 +377,11 @@ public partial class MainWindow : Window
 
     private async void OnPrintAttachmentButton(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button { Tag: int attachmentId }) return;
-        await PrintAttachmentAsync(attachmentId);
+        e.Handled = true;
+        if (sender is not FrameworkElement { DataContext: AttachmentRow row }) return;
+        FilesGrid.SelectedItem = row;
+        SetStatus($"Печать: {row.Filename}...");
+        await PrintAttachmentAsync(row.Id);
     }
 
     private async Task PrintAttachmentAsync(int attachmentId)
@@ -551,8 +554,11 @@ public partial class MainWindow : Window
 
     private async void OnCatalogPrintButton(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button { Tag: int productId }) return;
-        await PrintCatalogBarcodeAsync(productId);
+        e.Handled = true;
+        if (sender is not FrameworkElement { DataContext: CatalogRow row }) return;
+        CatalogGrid.SelectedItem = row;
+        SetStatus($"Печать ШК: {row.Sku}...");
+        await PrintCatalogBarcodeAsync(row.Id);
     }
 
     private async void OnCatalogPrintMenu(object sender, RoutedEventArgs e)
@@ -752,17 +758,22 @@ public partial class MainWindow : Window
         if (_fbsJobsPage + 1 < Paging.PageCount(_fbsJobs.Count)) { _fbsJobsPage++; RenderFbsJobs(); }
     }
 
-    private async void OnFbsJobSelected(object sender, SelectionChangedEventArgs e)
+    /// Clicking through the list must not fire a request per click: opening a
+    /// job is expensive on the server, and dozens of them queue up and stall
+    /// every later open.
+    private void OnFbsJobSelected(object sender, SelectionChangedEventArgs e)
     {
         if (_fbsJobsFilling || FbsJobsGrid.SelectedItem is not FbsJobRow row) return;
-        await OpenFbsJobAsync(row.Id);
+        _fbsPendingJobId = row.Id;
+        SetStatus($"Задание #{row.Id}...");
+        _fbsSelectTimer.Stop();
+        _fbsSelectTimer.Start();
     }
 
     /// Switching jobs abandons the previous request instead of queueing behind
     /// it, so clicking through the list stays responsive.
     private async Task OpenFbsJobAsync(int jobId)
     {
-        _prefetchTimer.Stop();
         var previous = _fbsOpenCts;
         var cts = new CancellationTokenSource();
         _fbsOpenCts = cts;
@@ -775,9 +786,8 @@ public partial class MainWindow : Window
             if (!ReferenceEquals(_fbsOpenCts, cts)) return;
             _fbsJob = job;
             RenderFbsJob();
-            SetStatus($"FBS задание #{job.Str("id")}");
+            SetStatus($"FBS задание #{job.Str("id")} · строк {job.Arr("lines").Count}");
             FocusScan();
-            _prefetchTimer.Start();
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
@@ -1202,44 +1212,27 @@ public partial class MainWindow : Window
             return;
         }
         if (!RequireApi()) return;
-        await PrefetchLabelsAsync(_fbsJob, true);
+        await DownloadLabelsAsync(_fbsJob);
     }
 
-    private async Task PrefetchLabelsAsync(JsonMap job, bool interactive)
+    /// Only ever on request: zipping the labels of a large job keeps the
+    /// server busy long enough to stall the next job you open.
+    private async Task DownloadLabelsAsync(JsonMap job)
     {
         var jobId = job.Int("id");
-        if (jobId == 0) return;
-        if (_prefetchJobId == jobId && !interactive) return;
-        if (!interactive && _cacheHintJobId == jobId && LabelsCached) return;
-        if (interactive)
-        {
-            if (_fbsBusy) return;
-            _fbsBusy = true;
-            SetStatus("Скачивание ярлыков...");
-        }
-        _prefetchJobId = jobId;
+        if (jobId == 0 || _fbsBusy) return;
+        _fbsBusy = true;
+        SetStatus("Скачивание ярлыков...");
         try
         {
             var zip = await _client.FbsDownloadLineLabelsZipAsync(jobId);
             var saved = await Task.Run(() => LabelCache.SaveZip(jobId, zip));
             InvalidateCacheHint();
             SetStatus($"Ярлыки сохранены локально: {saved}");
-            if (interactive) FocusScan();
+            FocusScan();
         }
-        catch (Exception ex)
-        {
-            if (interactive) ShowFbsError(ex);
-            else
-            {
-                FbsCacheHint.Text = "Не удалось скачать ярлыки";
-                FbsCacheHint.Foreground = Brushes.Firebrick;
-            }
-        }
-        finally
-        {
-            if (interactive) _fbsBusy = false;
-            if (_prefetchJobId == jobId) _prefetchJobId = null;
-        }
+        catch (Exception ex) { ShowFbsError(ex); }
+        finally { _fbsBusy = false; }
     }
 
     private async Task<List<byte[]>> ResolvePdfsAsync(int jobId, List<int> lineIds, List<string>? payloadPdfs)

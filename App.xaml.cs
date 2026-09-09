@@ -51,8 +51,39 @@ public partial class App : Application
             main.Tabs.SelectedIndex = index;
             Snapshot(main, Path.Combine(dir, $"tab_{name}.png"));
         }
+        ReportButtonHitTest(main);
         Console.WriteLine($"OK MainWindow built -> {dir}");
         main.Close();
+    }
+
+    /// The print button lives in a cell template, so a broken template shows up
+    /// as a missing, disabled or zero-sized button rather than a build error.
+    private static void ReportButtonHitTest(MainWindow main)
+    {
+        var button = FindChildren<System.Windows.Controls.Button>(main.CatalogGrid)
+            .FirstOrDefault(b => Equals(b.Content, "Печать ШК"));
+        if (button is null)
+        {
+            Console.WriteLine("FAIL print button not found in catalog grid");
+            return;
+        }
+        var usable = button.IsEnabled && button.IsHitTestVisible && button.ActualWidth > 1 && button.ActualHeight > 1;
+        Console.WriteLine(usable
+            ? $"OK print button {button.ActualWidth:0}x{button.ActualHeight:0}, enabled and hit-testable"
+            : $"FAIL print button unusable: enabled={button.IsEnabled} hitTest={button.IsHitTestVisible} size={button.ActualWidth:0}x{button.ActualHeight:0}");
+    }
+
+    private static IEnumerable<T> FindChildren<T>(DependencyObject parent) where T : DependencyObject
+    {
+        var count = VisualTreeHelper.GetChildrenCount(parent);
+        for (var i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is T typed)
+                yield return typed;
+            foreach (var nested in FindChildren<T>(child))
+                yield return nested;
+        }
     }
 
     private static void FillDemoRows(MainWindow main)

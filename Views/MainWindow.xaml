@@ -51,11 +51,6 @@
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
 
-        <!-- Names get trimmed in narrow columns, so keep the full text on hover. -->
-        <Style x:Key="CellTextTip" TargetType="TextBlock" BasedOn="{StaticResource CellText}">
-            <Setter Property="ToolTip" Value="{Binding Name}"/>
-        </Style>
-
         <Style x:Key="RowHeader" TargetType="DataGridColumnHeader">
             <Setter Property="Background" Value="#F5F5F5"/>
             <Setter Property="Foreground" Value="#444"/>
@@ -152,7 +147,7 @@
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Button Content="Печать" Style="{StaticResource CellButton}"
-                                                            Tag="{Binding Id}" Click="OnPrintAttachmentButton"/>
+                                                            Click="OnPrintAttachmentButton"/>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
@@ -244,7 +239,7 @@
                                                 </DataGridTemplateColumn.CellTemplate>
                                             </DataGridTemplateColumn>
                                             <DataGridTextColumn Header="Артикул" Binding="{Binding Sku}" Width="100" ElementStyle="{StaticResource CellText}"/>
-                                            <DataGridTextColumn Header="Название" Binding="{Binding Name}" Width="*" ElementStyle="{StaticResource CellTextTip}"/>
+                                            <DataGridTextColumn Header="Название" Binding="{Binding Name}" Width="*" ElementStyle="{StaticResource CellText}"/>
                                             <DataGridTextColumn Header="Ост." Binding="{Binding Qty}" Width="52" ElementStyle="{StaticResource CellText}"/>
                                             <DataGridTextColumn Header="ШК" Binding="{Binding Barcode}" Width="120" ElementStyle="{StaticResource CellText}"/>
                                         </DataGrid.Columns>
@@ -288,7 +283,7 @@
                                                 </DataGridTemplateColumn.CellTemplate>
                                             </DataGridTemplateColumn>
                                             <DataGridTextColumn Header="Артикул" Binding="{Binding Sku}" Width="100" ElementStyle="{StaticResource CellText}"/>
-                                            <DataGridTextColumn Header="Название" Binding="{Binding Name}" Width="*" ElementStyle="{StaticResource CellTextTip}"/>
+                                            <DataGridTextColumn Header="Название" Binding="{Binding Name}" Width="*" ElementStyle="{StaticResource CellText}"/>
                                             <DataGridTextColumn Header="Заказ" Binding="{Binding Order}" Width="130" ElementStyle="{StaticResource CellText}"/>
                                             <DataGridTextColumn Header="Статус" Binding="{Binding Status}" Width="100" ElementStyle="{StaticResource CellText}"/>
                                         </DataGrid.Columns>
@@ -334,12 +329,12 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
                             <DataGridTextColumn Header="Артикул" Binding="{Binding Sku}" Width="140" ElementStyle="{StaticResource CellText}"/>
-                            <DataGridTextColumn Header="Название" Binding="{Binding Name}" Width="*" ElementStyle="{StaticResource CellTextTip}"/>
+                            <DataGridTextColumn Header="Название" Binding="{Binding Name}" Width="*" ElementStyle="{StaticResource CellText}"/>
                             <DataGridTemplateColumn Header="" Width="130" CanUserResize="False">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <Button Content="Печать ШК" Style="{StaticResource CellButton}"
-                                                Tag="{Binding Id}" Click="OnCatalogPrintButton"/>
+                                                Click="OnCatalogPrintButton"/>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
