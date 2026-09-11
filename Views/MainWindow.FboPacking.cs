@@ -505,18 +505,29 @@ public partial class MainWindow
         }, status);
     }
 
+    private JsonMap? SelectedFboLine()
+    {
+        if (FboLinesGrid.SelectedItem is not FbsLineRow row || _fboJob is null) return null;
+        return _fboJob.Arr("lines").FirstOrDefault(l => l.Int("id") == row.Id);
+    }
+
     private void OnFboLinesContextOpening(object sender, ContextMenuEventArgs e)
     {
-        if (FboLinesGrid.SelectedItem is not FbsLineRow)
+        var line = SelectedFboLine();
+        if (line is null || FboLinesGrid.ContextMenu?.Items.Count is not > 0)
+        {
             e.Handled = true;
+            return;
+        }
+        if (FboLinesGrid.ContextMenu.Items[0] is MenuItem item)
+            item.Header = line.Str("status") is "printed" or "done" ? "Статус: в сборке" : "Статус: готово";
     }
 
     private async void OnFboLineStatusToggle(object sender, RoutedEventArgs e)
     {
-        if (FboLinesGrid.SelectedItem is not FbsLineRow row || _fboJob is null) return;
+        var line = SelectedFboLine();
+        if (line is null || _fboJob is null) return;
         if (!RequireFboApi()) return;
-        var line = _fboJob.Arr("lines").FirstOrDefault(l => l.Int("id") == row.Id);
-        if (line is null) return;
         var lineId = line.Int("id");
         var next = line.Str("status") is "printed" or "done" ? "pending" : "done";
         await FboRunAsync(async () =>
