@@ -1,6 +1,9 @@
 using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.Drawing.Printing;
 using System.IO;
+using System.Runtime.InteropServices;
 using PDFtoImage;
 using SkiaSharp;
 
@@ -21,13 +24,24 @@ public static class GdiPrinter
 
     public static void PrintPdf(byte[] pdfBytes, PrintProfile profile, int copies = 1)
     {
-        if (pdfBytes is null || pdfBytes.Length == 0)
-            throw new InvalidOperationException("Пустой PDF");
+        PrintPdfs([pdfBytes], profile, copies);
+    }
+
+    public static void PrintPdfs(IEnumerable<byte[]> pdfs, PrintProfile profile, int copies = 1)
+    {
         var options = PrintOptions.Parse(profile.Settings);
         var dpi = options.Paper == "a4" ? 200 : 300;
-        var pages = Rasterize(pdfBytes, dpi);
+        var pages = new List<(Bitmap Bitmap, (double W, double H) Pts)>();
         try
         {
+            foreach (var pdf in pdfs)
+            {
+                if (pdf is null || pdf.Length == 0)
+                    continue;
+                pages.AddRange(Rasterize(pdf, dpi));
+            }
+            if (pages.Count == 0)
+                throw new InvalidOperationException("Пустой PDF");
             lock (Gate)
                 PrintPages(pages, profile.Printer, Math.Clamp(copies, 1, 9999), options);
         }
@@ -50,7 +64,6 @@ public static class GdiPrinter
     {
         using var stream = new MemoryStream(pdf, writable: false);
         var pages = new List<(Bitmap, (double, double))>();
-        var index = 0;
         foreach (var sk in Conversion.ToImages(stream, options: new RenderOptions { Dpi = dpi }))
         {
             using (sk)
@@ -58,7 +71,6 @@ public static class GdiPrinter
                 var bmp = ToBitmap(sk);
                 pages.Add((bmp, (bmp.Width * 72.0 / dpi, bmp.Height * 72.0 / dpi)));
             }
-            index++;
         }
         if (pages.Count == 0)
             throw new InvalidOperationException("Empty PDF");
@@ -67,12 +79,31 @@ public static class GdiPrinter
 
     private static Bitmap ToBitmap(SKBitmap sk)
     {
-        using var image = SKImage.FromBitmap(sk);
-        using var data = image.Encode(SKEncodedImageFormat.Png, 92);
-        using var ms = new MemoryStream();
-        data.SaveTo(ms);
-        ms.Position = 0;
-        return new Bitmap(ms);
+        using var src = sk.ColorType == SKColorType.Bgra8888 ? null : sk.Copy(SKColorType.Bgra8888);
+        var pixels = src ?? sk;
+        var bmp = new Bitmap(pixels.Width, pixels.Height, PixelFormat.Format32bppPArgb);
+        var data = bmp.LockBits(
+            new Rectangle(0, 0, bmp.Width, bmp.Height),
+            ImageLockMode.WriteOnly,
+            PixelFormat.Format32bppPArgb);
+        try
+        {
+            var srcPtr = pixels.GetPixels();
+            var srcStride = pixels.RowBytes;
+            var dstStride = data.Stride;
+            var rowBytes = Math.Min(srcStride, dstStride);
+            var row = new byte[rowBytes];
+            for (var y = 0; y < pixels.Height; y++)
+            {
+                Marshal.Copy(IntPtr.Add(srcPtr, y * srcStride), row, 0, rowBytes);
+                Marshal.Copy(row, 0, IntPtr.Add(data.Scan0, y * dstStride), rowBytes);
+            }
+        }
+        finally
+        {
+            bmp.UnlockBits(data);
+        }
+        return bmp;
     }
 
     private static void PrintPages(
@@ -83,8 +114,11 @@ public static class GdiPrinter
     {
         using var doc = new PrintDocument();
         doc.DocumentName = "Warehouse packing";
+        doc.PrintController = new StandardPrintController();
+        doc.OriginAtMargins = false;
         doc.PrinterSettings.PrinterName = ResolvePrinter(printer);
         doc.PrinterSettings.Copies = 1;
+        doc.DefaultPageSettings.Margins = new Margins(0, 0, 0, 0);
         ApplyPaper(doc, options);
 
         var pageIndex = 0;
@@ -95,6 +129,10 @@ public static class GdiPrinter
             var area = e.PageBounds;
             if (e.Graphics is null)
                 return;
+            e.Graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
+            e.Graphics.PixelOffsetMode = PixelOffsetMode.Half;
+            e.Graphics.SmoothingMode = SmoothingMode.None;
+            e.Graphics.CompositingMode = CompositingMode.SourceCopy;
             var dest = DestRect(image, pts, area.Size, options.Noscale, e.Graphics.DpiX, e.Graphics.DpiY);
             e.Graphics.DrawImage(image, dest);
             pageIndex++;

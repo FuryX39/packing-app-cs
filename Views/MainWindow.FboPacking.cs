@@ -331,8 +331,8 @@ public partial class MainWindow
         await FboRunAsync(async () =>
         {
             var pdfs = await ResolveFboPdfsAsync(jobId, _fboLastScanLineIds, null);
-            foreach (var pdf in pdfs)
-                GdiPrinter.PrintPdf(pdf, _config.LabelProfile());
+            if (pdfs.Count > 0)
+                await Task.Run(() => GdiPrinter.PrintPdfs(pdfs, _config.LabelProfile()));
             SetStatus($"Ярлык перепечатан ({pdfs.Count})");
             FocusFboScan();
         }, "Перепечатка...");
@@ -351,8 +351,8 @@ public partial class MainWindow
         await FboRunAsync(async () =>
         {
             var pdfs = await ResolveFboPdfsAsync(jobId, ids, null);
-            foreach (var pdf in pdfs)
-                GdiPrinter.PrintPdf(pdf, _config.LabelProfile());
+            if (pdfs.Count > 0)
+                await Task.Run(() => GdiPrinter.PrintPdfs(pdfs, _config.LabelProfile()));
             SetStatus($"На повторную печать: {pdfs.Count} ярл.");
             FocusFboScan();
         }, "Перепечатка...");
@@ -409,7 +409,7 @@ public partial class MainWindow
         await FboRunAsync(async () =>
         {
             var pdf = await _client.FboDownloadSupplyQrAsync(_fboJob.Int("id"));
-            GdiPrinter.PrintPdf(pdf, _config.LabelProfile());
+            await Task.Run(() => GdiPrinter.PrintPdf(pdf, _config.LabelProfile()));
             SetStatus("QR поставки отправлен на печать");
             FocusFboScan();
         }, "Печать QR поставки...");
@@ -425,7 +425,7 @@ public partial class MainWindow
         await FboRunAsync(async () =>
         {
             var pdf = await _client.FboDownloadPalletSheetsAsync(_fboJob.Int("id"));
-            GdiPrinter.PrintPdf(pdf, _config.A4Profile());
+            await Task.Run(() => GdiPrinter.PrintPdf(pdf, _config.A4Profile()));
             SetStatus("Листы паллет отправлены на печать");
             FocusFboScan();
         }, "Печать листов...");
@@ -473,10 +473,10 @@ public partial class MainWindow
             Exception? closeError = null;
             try
             {
-                foreach (var pdf in pdfs)
+                if (pdfs.Count > 0)
                 {
-                    GdiPrinter.PrintPdf(pdf, profile);
-                    printed++;
+                    await Task.Run(() => GdiPrinter.PrintPdfs(pdfs, profile));
+                    printed = pdfs.Count;
                 }
             }
             catch (Exception ex) { printError = ex; }
