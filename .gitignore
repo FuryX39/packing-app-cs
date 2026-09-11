@@ -1,4 +1,3 @@
-bin/
 obj/
 publish/
 .vs/
@@ -11,6 +10,10 @@ config.env
 cache/
 smoke/
 *.log
-*.pdb
 Thumbs.db
 .DS_Store
+
+# Debug exe lives in bin/; keep secrets and working caches out of it.
+bin/**/config.env
+bin/**/cache/
+bin/**/smoke/
