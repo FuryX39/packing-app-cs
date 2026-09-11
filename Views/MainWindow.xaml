@@ -105,57 +105,127 @@
             </StackPanel>
         </DockPanel>
         <TabControl x:Name="Tabs" Margin="10" SelectionChanged="OnTabChanged">
-            <TabItem Header="Задания">
+            <TabItem Header="Упаковка FBO">
                 <DockPanel Margin="6">
-                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
-                        <Button Content="Обновить" Click="OnReloadTasks"/>
-                        <Button Content="Печать все А4" Click="OnPrintAllA4"/>
-                        <Button Content="Печать все этикетки" Click="OnPrintAllLabels"/>
-                        <Button Content="Печать всё" Click="OnPrintAllFiles"/>
-                    </StackPanel>
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <Button DockPanel.Dock="Left" Content="Обновить" Click="OnReloadFbo"/>
+                        <Button DockPanel.Dock="Left" Content="Скачать ярлыки" Click="OnDownloadFboLabels"/>
+                        <Button DockPanel.Dock="Left" Content="Печать QR поставки" Click="OnPrintFboSupplyQr"/>
+                        <Button DockPanel.Dock="Left" Content="Печать листов" Click="OnPrintFboPalletSheets"/>
+                        <TextBlock x:Name="FboCacheHint" VerticalAlignment="Center" Margin="12,0,0,0" Foreground="#555"/>
+                        <TextBlock x:Name="FboApiHint" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                    </DockPanel>
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="1.1*"/>
+                            <ColumnDefinition Width="260" MinWidth="200"/>
                             <ColumnDefinition Width="6"/>
-                            <ColumnDefinition Width="2*"/>
+                            <ColumnDefinition Width="*" MinWidth="480"/>
                         </Grid.ColumnDefinitions>
                         <DockPanel>
-                            <TextBlock DockPanel.Dock="Top" Text="Мои задания" Margin="0,0,0,4"/>
-                            <DataGrid x:Name="TasksGrid" Style="{StaticResource RowLinesGrid}"
-                                      RowStyle="{StaticResource TaskRowStyle}"
-                                      SelectionChanged="OnTaskSelected">
+                            <TextBlock DockPanel.Dock="Top" Text="Мои задания FBO WB" Margin="0,0,0,4"/>
+                            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,4,0,0">
+                                <Button Content="Назад" Click="OnFboJobsPrev" x:Name="FboJobsPrev"/>
+                                <TextBlock x:Name="FboJobsPageLabel" VerticalAlignment="Center" Margin="8,0"/>
+                                <Button Content="Вперёд" Click="OnFboJobsNext" x:Name="FboJobsNext"/>
+                            </StackPanel>
+                            <DataGrid x:Name="FboJobsGrid" Style="{StaticResource RowLinesGrid}"
+                                      SelectionChanged="OnFboJobSelected">
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Дата сборки" Binding="{Binding Assembly}" Width="110" ElementStyle="{StaticResource CellText}"/>
-                                    <DataGridTextColumn Header="Маркетплейс" Binding="{Binding Marketplace}" Width="*" ElementStyle="{StaticResource CellText}"/>
-                                    <DataGridTextColumn Header="Дата отгрузки" Binding="{Binding Ship}" Width="110" ElementStyle="{StaticResource CellText}"/>
+                                    <DataGridTextColumn Header="№" Binding="{Binding Id}" Width="52" ElementStyle="{StaticResource CellText}"/>
+                                    <DataGridTextColumn Header="Статус" Binding="{Binding Status}" Width="*" ElementStyle="{StaticResource CellText}"/>
+                                    <DataGridTextColumn Header="Готово" Binding="{Binding Progress}" Width="72" ElementStyle="{StaticResource CellText}"/>
                                 </DataGrid.Columns>
                             </DataGrid>
                         </DockPanel>
                         <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Stretch"/>
                         <DockPanel Grid.Column="2">
-                            <TextBlock DockPanel.Dock="Top" Text="Детали задания"/>
-                            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,6,0,8">
-                                <TextBlock Text="Статус" VerticalAlignment="Center"/>
-                                <ComboBox x:Name="TaskStatusBox" Width="220" Margin="8,0,0,0" SelectionChanged="OnTaskStatusChanged"/>
-                            </StackPanel>
-                            <GroupBox Header="Файлы для печати" DockPanel.Dock="Bottom" Height="200" Padding="6">
-                                <DataGrid x:Name="FilesGrid" Style="{StaticResource RowLinesGrid}">
-                                    <DataGrid.Columns>
-                                        <DataGridTextColumn Header="Тип" Binding="{Binding Kind}" Width="90" ElementStyle="{StaticResource CellText}"/>
-                                        <DataGridTextColumn Header="Файл" Binding="{Binding Filename}" Width="*" ElementStyle="{StaticResource CellText}"/>
-                                        <DataGridTemplateColumn Header="" Width="100" CanUserResize="False">
-                                            <DataGridTemplateColumn.CellTemplate>
-                                                <DataTemplate>
-                                                    <Button Content="Печать" Style="{StaticResource CellButton}"
-                                                            Click="OnPrintAttachmentButton"/>
-                                                </DataTemplate>
-                                            </DataGridTemplateColumn.CellTemplate>
-                                        </DataGridTemplateColumn>
-                                    </DataGrid.Columns>
-                                </DataGrid>
+                            <DockPanel DockPanel.Dock="Top">
+                                <TextBlock x:Name="FboJobTitle" Text="Выберите задание" FontWeight="SemiBold" FontSize="14"/>
+                                <TextBlock x:Name="FboJobStats" HorizontalAlignment="Right"/>
+                            </DockPanel>
+                            <GroupBox Header="Активный короб (наклеить этикетку грузоместа)" DockPanel.Dock="Top" Margin="0,8" Padding="8">
+                                <DockPanel>
+                                    <Border DockPanel.Dock="Left" Width="110" Height="110" Background="#F3F3F3" BorderBrush="#CCC" BorderThickness="1" Margin="0,0,10,0">
+                                        <Image x:Name="FboActiveImage" Stretch="Uniform"/>
+                                    </Border>
+                                    <StackPanel>
+                                        <TextBlock x:Name="FboActiveText" Text="Нет активной строки — пикните товар" TextWrapping="Wrap"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                            <Button Content="Перепечатать ярлык" Click="OnFboReprint"/>
+                                            <Button Content="Отменить печать" Click="OnFboCancelPrint"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </DockPanel>
                             </GroupBox>
-                            <TextBox x:Name="TaskDescription" IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True"
-                                     VerticalScrollBarVisibility="Auto" Margin="0,0,0,8"/>
+                            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                                <TextBlock Text="Сканер" VerticalAlignment="Center"/>
+                                <Button DockPanel.Dock="Right" Content="OK" Click="OnFboScan"/>
+                                <TextBox x:Name="FboScanBox" Margin="8,0" KeyDown="OnFboScanKey"/>
+                            </DockPanel>
+                            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,4">
+                                <CheckBox x:Name="FboManualBox" Content="Ручная сборка (остаток + ШК с экрана)" Click="OnFboManualToggle"/>
+                                <CheckBox x:Name="FboBatchBox" Content="Печатать все этикетки на SKU" Margin="16,0,0,0"/>
+                                <CheckBox x:Name="FboSkipMpBox" Content="Без подтверждения ШК с МП" Margin="16,0,0,0"/>
+                            </StackPanel>
+                            <GroupBox x:Name="FboManualPanel" Header="Остаток к сборке" DockPanel.Dock="Top" Height="220" Margin="0,0,0,8" Visibility="Collapsed">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="200"/>
+                                    </Grid.ColumnDefinitions>
+                                    <DataGrid x:Name="FboRemainingGrid" Style="{StaticResource RowLinesGrid}"
+                                              MouseDoubleClick="OnFboRemainingPick">
+                                        <DataGrid.Columns>
+                                            <DataGridTemplateColumn Header="Фото" Width="48" CanUserResize="False">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <Image Source="{Binding Photo}" Width="30" Height="30" Stretch="Uniform"/>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                            <DataGridTextColumn Header="Артикул" Binding="{Binding Sku}" Width="100" ElementStyle="{StaticResource CellText}"/>
+                                            <DataGridTextColumn Header="Название" Binding="{Binding Name}" Width="*" ElementStyle="{StaticResource CellText}"/>
+                                            <DataGridTextColumn Header="Ост." Binding="{Binding Qty}" Width="52" ElementStyle="{StaticResource CellText}"/>
+                                            <DataGridTextColumn Header="ШК" Binding="{Binding Barcode}" Width="120" ElementStyle="{StaticResource CellText}"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                    <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                        <Button Content="Взять (тап)" Click="OnFboRemainingPick"/>
+                                    </StackPanel>
+                                </Grid>
+                            </GroupBox>
+                            <GroupBox Header="Строки задания" Padding="6">
+                                <DockPanel>
+                                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,4,0,0">
+                                        <Button Content="Назад" Click="OnFboLinesPrev" x:Name="FboLinesPrev"/>
+                                        <TextBlock x:Name="FboLinesPageLabel" VerticalAlignment="Center" Margin="8,0"/>
+                                        <Button Content="Вперёд" Click="OnFboLinesNext" x:Name="FboLinesNext"/>
+                                    </StackPanel>
+                                    <DataGrid x:Name="FboLinesGrid" Style="{StaticResource RowLinesGrid}"
+                                              PreviewMouseRightButtonDown="OnGridRightButtonDown"
+                                              ContextMenuOpening="OnFboLinesContextOpening">
+                                        <DataGrid.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Статус: готово" Click="OnFboLineStatusToggle"/>
+                                            </ContextMenu>
+                                        </DataGrid.ContextMenu>
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="№" Binding="{Binding Seq}" Width="44" ElementStyle="{StaticResource CellText}"/>
+                                            <DataGridTemplateColumn Header="Фото" Width="48" CanUserResize="False">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <Image Source="{Binding Photo}" Width="30" Height="30" Stretch="Uniform"/>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                            <DataGridTextColumn Header="Артикул" Binding="{Binding Sku}" Width="100" ElementStyle="{StaticResource CellText}"/>
+                                            <DataGridTextColumn Header="Название" Binding="{Binding Name}" Width="*" ElementStyle="{StaticResource CellText}"/>
+                                            <DataGridTextColumn Header="Короб" Binding="{Binding Order}" Width="130" ElementStyle="{StaticResource CellText}"/>
+                                            <DataGridTextColumn Header="Статус" Binding="{Binding Status}" Width="100" ElementStyle="{StaticResource CellText}"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </DockPanel>
+                            </GroupBox>
                         </DockPanel>
                     </Grid>
                 </DockPanel>
@@ -341,6 +411,61 @@
                             </DataGridTemplateColumn>
                         </DataGrid.Columns>
                     </DataGrid>
+                </DockPanel>
+            </TabItem>
+            <TabItem Header="Задания" Visibility="Collapsed">
+                <DockPanel Margin="6">
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                        <Button Content="Обновить" Click="OnReloadTasks"/>
+                        <Button Content="Печать все А4" Click="OnPrintAllA4"/>
+                        <Button Content="Печать все этикетки" Click="OnPrintAllLabels"/>
+                        <Button Content="Печать всё" Click="OnPrintAllFiles"/>
+                    </StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.1*"/>
+                            <ColumnDefinition Width="6"/>
+                            <ColumnDefinition Width="2*"/>
+                        </Grid.ColumnDefinitions>
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="Мои задания" Margin="0,0,0,4"/>
+                            <DataGrid x:Name="TasksGrid" Style="{StaticResource RowLinesGrid}"
+                                      RowStyle="{StaticResource TaskRowStyle}"
+                                      SelectionChanged="OnTaskSelected">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Дата сборки" Binding="{Binding Assembly}" Width="110" ElementStyle="{StaticResource CellText}"/>
+                                    <DataGridTextColumn Header="Маркетплейс" Binding="{Binding Marketplace}" Width="*" ElementStyle="{StaticResource CellText}"/>
+                                    <DataGridTextColumn Header="Дата отгрузки" Binding="{Binding Ship}" Width="110" ElementStyle="{StaticResource CellText}"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </DockPanel>
+                        <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Stretch"/>
+                        <DockPanel Grid.Column="2">
+                            <TextBlock DockPanel.Dock="Top" Text="Детали задания"/>
+                            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,6,0,8">
+                                <TextBlock Text="Статус" VerticalAlignment="Center"/>
+                                <ComboBox x:Name="TaskStatusBox" Width="220" Margin="8,0,0,0" SelectionChanged="OnTaskStatusChanged"/>
+                            </StackPanel>
+                            <GroupBox Header="Файлы для печати" DockPanel.Dock="Bottom" Height="200" Padding="6">
+                                <DataGrid x:Name="FilesGrid" Style="{StaticResource RowLinesGrid}">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Тип" Binding="{Binding Kind}" Width="90" ElementStyle="{StaticResource CellText}"/>
+                                        <DataGridTextColumn Header="Файл" Binding="{Binding Filename}" Width="*" ElementStyle="{StaticResource CellText}"/>
+                                        <DataGridTemplateColumn Header="" Width="100" CanUserResize="False">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Content="Печать" Style="{StaticResource CellButton}"
+                                                            Click="OnPrintAttachmentButton"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </GroupBox>
+                            <TextBox x:Name="TaskDescription" IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True"
+                                     VerticalScrollBarVisibility="Auto" Margin="0,0,0,8"/>
+                        </DockPanel>
+                    </Grid>
                 </DockPanel>
             </TabItem>
         </TabControl>

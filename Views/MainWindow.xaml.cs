@@ -61,6 +61,25 @@ public partial class MainWindow : Window
     private int _cachedLabelsTotal;
     private string _activeImageUrl = "";
 
+    private bool _fboBusy;
+    private bool _fboJobsFilling;
+    private List<JsonMap> _fboJobs = [];
+    private JsonMap? _fboJob;
+    private int _fboJobsPage;
+    private int _fboLinesPage;
+    private object? _fboPagedJobId;
+    private JsonMap? _fboSelectedGroup;
+    private string _fboLastScanCode = "";
+    private string _fboLastScanSku = "";
+    private List<int> _fboLastScanLineIds = [];
+    private readonly ObservableCollection<FbsJobRow> _fboJobRows = [];
+    private readonly ObservableCollection<FbsLineRow> _fboLineRows = [];
+    private readonly ObservableCollection<RemainingRow> _fboRemainingRows = [];
+    private CancellationTokenSource? _fboOpenCts;
+    private readonly DispatcherTimer _fboSelectTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
+    private int _fboPendingJobId;
+    private string _fboActiveImageUrl = "";
+
     public MainWindow(AppConfig config, ApiClient client, string userName)
     {
         InitializeComponent();
@@ -70,6 +89,7 @@ public partial class MainWindow : Window
         Title = $"Warehouse Packing — {userName}";
         WindowState = WindowState.Maximized;
         FbsSkipMpBox.IsChecked = config.SkipMpConfirm;
+        FboSkipMpBox.IsChecked = config.SkipMpConfirm;
 
         // Assigned once: mutating the collections keeps user column widths and
         // the current selection, re-assigning ItemsSource would reset both.
@@ -79,10 +99,13 @@ public partial class MainWindow : Window
         FbsJobsGrid.ItemsSource = _fbsJobRows;
         FbsLinesGrid.ItemsSource = _fbsLineRows;
         FbsRemainingGrid.ItemsSource = _remainingRows;
+        FboJobsGrid.ItemsSource = _fboJobRows;
+        FboLinesGrid.ItemsSource = _fboLineRows;
+        FboRemainingGrid.ItemsSource = _fboRemainingRows;
 
         _tasksTimer.Tick += (_, _) =>
         {
-            if (Tabs.SelectedIndex == 0)
+            if (Tabs.SelectedIndex == 3)
                 _ = LoadTasksAsync(true);
         };
         _fbsSelectTimer.Tick += (_, _) =>
@@ -91,7 +114,13 @@ public partial class MainWindow : Window
             if (_fbsPendingJobId > 0)
                 _ = OpenFbsJobAsync(_fbsPendingJobId);
         };
-        Loaded += async (_, _) => await LoadTasksAsync(false);
+        _fboSelectTimer.Tick += (_, _) =>
+        {
+            _fboSelectTimer.Stop();
+            if (_fboPendingJobId > 0)
+                _ = OpenFboJobAsync(_fboPendingJobId);
+        };
+        Loaded += async (_, _) => await LoadFboJobsAsync();
     }
 
     private void SetStatus(string text) => StatusText.Text = text;
@@ -100,7 +129,9 @@ public partial class MainWindow : Window
     {
         _tasksTimer.Stop();
         _fbsSelectTimer.Stop();
+        _fboSelectTimer.Stop();
         _fbsOpenCts?.Cancel();
+        _fboOpenCts?.Cancel();
         await _client.LogoutAsync();
         _client.Dispose();
     }
@@ -129,7 +160,8 @@ public partial class MainWindow : Window
         switch (Tabs.SelectedIndex)
         {
             case 0:
-                _ = LoadTasksAsync(false);
+                _tasksTimer.Stop();
+                _ = LoadFboJobsAsync();
                 break;
             case 1:
                 _tasksTimer.Stop();
@@ -146,7 +178,7 @@ public partial class MainWindow : Window
     {
         _tasksTimer.Stop();
         _tasksTimer.Interval = TimeSpan.FromMilliseconds(_config.RefreshMs);
-        if (Tabs.SelectedIndex == 0)
+        if (Tabs.SelectedIndex == 3)
             _tasksTimer.Start();
     }
 

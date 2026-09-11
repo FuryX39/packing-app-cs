@@ -169,6 +169,56 @@ public sealed class ApiClient : IDisposable
     public Task<byte[]> FbsDownloadLineLabelsZipAsync(int jobId, CancellationToken ct = default) =>
         ApiBytesAsync($"/api/v1/fbs-packing/jobs/{jobId}/line-labels.zip", 180, ct);
 
+    public async Task<List<JsonMap>> FboMyJobsAsync(CancellationToken ct = default)
+    {
+        var body = await ApiJsonAsync("GET", "/api/v1/fbo-packing/my", null, 30, ct);
+        return body.Arr("jobs");
+    }
+
+    public async Task<JsonMap> FboOpenJobAsync(int jobId, CancellationToken ct = default)
+    {
+        var body = await ApiJsonAsync("GET", $"/api/v1/fbo-packing/jobs/{jobId}/pack", null, 30, ct);
+        return body.Obj("job") ?? body;
+    }
+
+    public Task<JsonMap> FboScanProductAsync(int jobId, string barcode, bool batch, bool includePdf, bool autoClose, CancellationToken ct = default) =>
+        ApiJsonAsync("POST", $"/api/v1/fbo-packing/jobs/{jobId}/scan-product", new
+        {
+            barcode,
+            batch,
+            include_pdf = includePdf,
+            auto_close = autoClose,
+        }, 60, ct);
+
+    public Task<JsonMap> FboPickSkuAsync(int jobId, string sku, int? productId, bool batch, bool includePdf, bool autoClose, CancellationToken ct = default)
+    {
+        object body = productId is int pid
+            ? new { sku, product_id = pid, batch, include_pdf = includePdf, auto_close = autoClose }
+            : new { sku, batch, include_pdf = includePdf, auto_close = autoClose };
+        return ApiJsonAsync("POST", $"/api/v1/fbo-packing/jobs/{jobId}/pick-sku", body, 60, ct);
+    }
+
+    public Task<JsonMap> FboCloseLineAsync(int jobId, int lineId, CancellationToken ct = default) =>
+        ApiJsonAsync("POST", $"/api/v1/fbo-packing/jobs/{jobId}/lines/{lineId}/close", null, 30, ct);
+
+    public Task<JsonMap> FboCancelPrintAsync(int jobId, int lineId, CancellationToken ct = default) =>
+        ApiJsonAsync("POST", $"/api/v1/fbo-packing/jobs/{jobId}/lines/{lineId}/cancel-print", null, 30, ct);
+
+    public Task<JsonMap> FboSetLineStatusAsync(int jobId, int lineId, string status, CancellationToken ct = default) =>
+        ApiJsonAsync("POST", $"/api/v1/fbo-packing/jobs/{jobId}/lines/{lineId}/set-status", new { status }, 30, ct);
+
+    public Task<byte[]> FboDownloadLinePdfAsync(int jobId, int lineId, CancellationToken ct = default) =>
+        ApiBytesAsync($"/api/v1/fbo-packing/jobs/{jobId}/lines/{lineId}/label", 60, ct);
+
+    public Task<byte[]> FboDownloadLineLabelsZipAsync(int jobId, CancellationToken ct = default) =>
+        ApiBytesAsync($"/api/v1/fbo-packing/jobs/{jobId}/line-labels.zip", 180, ct);
+
+    public Task<byte[]> FboDownloadSupplyQrAsync(int jobId, CancellationToken ct = default) =>
+        ApiBytesAsync($"/api/v1/fbo-packing/jobs/{jobId}/supply-qr.pdf", 60, ct);
+
+    public Task<byte[]> FboDownloadPalletSheetsAsync(int jobId, CancellationToken ct = default) =>
+        ApiBytesAsync($"/api/v1/fbo-packing/jobs/{jobId}/pallet-sheets.pdf", 120, ct);
+
     public void Dispose()
     {
         _web.Dispose();

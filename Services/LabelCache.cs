@@ -6,30 +6,31 @@ namespace WarehousePacking.Services;
 public static class LabelCache
 {
     public static string Root => Path.Combine(AppContext.BaseDirectory, "cache", "fbs_labels");
+    public static string FboRoot => Path.Combine(AppContext.BaseDirectory, "cache", "fbo_labels");
 
-    public static string LinePath(int jobId, int lineId) =>
-        Path.Combine(Root, jobId.ToString(), $"{lineId}.pdf");
+    public static string LinePath(int jobId, int lineId, string? root = null) =>
+        Path.Combine(root ?? Root, jobId.ToString(), $"{lineId}.pdf");
 
-    public static bool HasLine(int jobId, int lineId)
+    public static bool HasLine(int jobId, int lineId, string? root = null)
     {
-        var path = LinePath(jobId, lineId);
+        var path = LinePath(jobId, lineId, root);
         return File.Exists(path) && new FileInfo(path).Length > 4;
     }
 
-    public static byte[]? GetLine(int jobId, int lineId)
+    public static byte[]? GetLine(int jobId, int lineId, string? root = null)
     {
-        var path = LinePath(jobId, lineId);
+        var path = LinePath(jobId, lineId, root);
         if (!File.Exists(path))
             return null;
         var data = File.ReadAllBytes(path);
         return data.Length >= 4 && data[0] == (byte)'%' && data[1] == (byte)'P' ? data : null;
     }
 
-    public static void PutLine(int jobId, int lineId, byte[] data)
+    public static void PutLine(int jobId, int lineId, byte[] data, string? root = null)
     {
         if (data is null || data.Length < 4 || data[0] != (byte)'%')
             return;
-        var path = LinePath(jobId, lineId);
+        var path = LinePath(jobId, lineId, root);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var tmp = path + ".tmp";
         File.WriteAllBytes(tmp, data);
@@ -64,7 +65,7 @@ public static class LabelCache
         return ids.Count > 0 && ids.All(lineId => HasLine(id.Value, lineId));
     }
 
-    public static int SaveZip(int jobId, byte[] zipBytes)
+    public static int SaveZip(int jobId, byte[] zipBytes, string? root = null)
     {
         var saved = 0;
         using var ms = new MemoryStream(zipBytes);
@@ -81,7 +82,7 @@ public static class LabelCache
             using var stream = entry.Open();
             using var buf = new MemoryStream();
             stream.CopyTo(buf);
-            PutLine(jobId, lineId, buf.ToArray());
+            PutLine(jobId, lineId, buf.ToArray(), root);
             saved++;
         }
         return saved;
