@@ -192,7 +192,7 @@ public partial class MainWindow
         if (text.Length == 0) return;
         _fboQtyWarning = text;
         ApplyFboQtyWarning();
-        MessageBox.Show(this, text, "Нестандартный короб", MessageBoxButton.OK, MessageBoxImage.Warning);
+        MessageBox.Show(this, text, "Нестандартное грузоместо", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
     private void SetFboActiveImage(string url)

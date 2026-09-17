@@ -138,7 +138,7 @@ public partial class MainWindow
         var printed = job?.Int("box_printed") ?? 0;
         var pending = job?.Int("box_pending") ?? 0;
         var pcs = job is null ? "" : $" · шт. {job.Int("pcs_assigned")}/{job.Int("pcs_plan")}";
-        FboNewJobStats.Text = $"короба {assigned}/{total} · напечатано {printed} · не печатались {pending}{pcs}";
+        FboNewJobStats.Text = $"грузоместа {assigned}/{total} · напечатано {printed} · не печатались {pending}{pcs}";
         RefreshFboNewSelectedText();
         RenderFboNewRemaining();
         ApplyFboNewQtyWarning();
@@ -176,13 +176,13 @@ public partial class MainWindow
     {
         if (_fboNewProduct is null)
         {
-            FboNewSelectedText.Text = "Сначала пикните товар, затем ШК короба WB";
+            FboNewSelectedText.Text = "Сначала пикните товар, затем грузоместо";
             return;
         }
         var sku = _fboNewProduct.Str("sku");
         var name = _fboNewProduct.Str("name", sku);
         var left = _fboNewProduct.Int("quantity", _fboNewProduct.Int("qty_plan") - _fboNewProduct.Int("qty_assigned"));
-        FboNewSelectedText.Text = $"Товар {sku} · {name} · баркод {_fboNewProduct.Str("barcode")} · осталось {left} шт. Пикните ШК короба WB.";
+        FboNewSelectedText.Text = $"Товар {sku} · {name} · баркод {_fboNewProduct.Str("barcode")} · осталось {left} шт. Пикните грузоместо.";
     }
 
     private void ApplyFboNewQtyWarning()
@@ -198,7 +198,7 @@ public partial class MainWindow
         _fboNewQtyWarning = text;
         ApplyFboNewQtyWarning();
         if (text.Length == 0) return;
-        MessageBox.Show(this, text, "Нестандартный короб", MessageBoxButton.OK, MessageBoxImage.Warning);
+        MessageBox.Show(this, text, "Нестандартное грузоместо", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
     private void ApplyFboNewProduct(JsonMap product, int? suggestedQty)
@@ -250,7 +250,7 @@ public partial class MainWindow
         }
         if (!int.TryParse((FboNewPrintCount.Text ?? "").Trim(), out var count) || count <= 0)
         {
-            MessageBox.Show(this, "Укажите, сколько ШК коробов напечатать", "FBO WB new");
+            MessageBox.Show(this, "Укажите, сколько ШК грузомест напечатать", "FBO WB new");
             return;
         }
         var jobId = _fboNewJob.Int("id");
@@ -266,16 +266,16 @@ public partial class MainWindow
                 await Task.Run(() => GdiPrinter.PrintPdfs(pdfs, _config.LabelProfile()));
             RenderFboNewJob();
             RenderFboNewJobs();
-            SetStatus($"Напечатано ШК коробов: {pdfs.Count}");
+            SetStatus($"Напечатано ШК грузомест: {pdfs.Count}");
             FocusFboNewScan();
-        }, "Печать ШК коробов...");
+        }, "Печать ШК грузомест...");
     }
 
     private async void OnFboNewReprintLast(object sender, RoutedEventArgs e)
     {
         if (_fboNewJob is null || _fboNewLastPrintedBoxId <= 0)
         {
-            MessageBox.Show(this, "Нет последнего напечатанного ШК короба", "FBO WB new");
+            MessageBox.Show(this, "Нет последнего напечатанного ШК грузоместа", "FBO WB new");
             return;
         }
         var jobId = _fboNewJob.Int("id");
@@ -288,7 +288,7 @@ public partial class MainWindow
             if (pdfs.Count > 0)
                 await Task.Run(() => GdiPrinter.PrintPdfs(pdfs, _config.LabelProfile()));
             RenderFboNewJob();
-            SetStatus("Ярлык короба перепечатан");
+            SetStatus("Ярлык грузоместа перепечатан");
             FocusFboNewScan();
         }, "Перепечатка...");
     }
@@ -337,10 +337,10 @@ public partial class MainWindow
             if (kind == "wb_box")
             {
                 if (_fboNewProduct is null)
-                    throw new ApiException("Сначала пикните товар, затем ШК короба WB");
+                    throw new ApiException("Сначала пикните товар, затем грузоместо");
                 var qty = ReadFboNewQty();
                 if (qty is null or <= 0)
-                    throw new ApiException("Укажите количество товара в коробе");
+                    throw new ApiException("Укажите количество товара в грузоместе");
                 var productBarcode = _fboNewProduct.Str("barcode");
                 var payload = await _client.FboSheetAssignAsync(jobId, code, productBarcode, qty.Value);
                 _fboNewJob = payload.Obj("job") ?? _fboNewJob;
@@ -365,7 +365,7 @@ public partial class MainWindow
                 RenderFboNewJob();
                 RenderFboNewJobs();
                 ShowFboNewQtyWarningDialog(warning);
-                SetStatus($"Короб {box?.Str("box_id") ?? ""} · {qty} шт.");
+                SetStatus($"Грузоместо {box?.Str("box_id") ?? ""} · {qty} шт.");
                 FocusFboNewScan();
                 return;
             }

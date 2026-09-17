@@ -143,7 +143,7 @@
                                 <TextBlock x:Name="FboJobTitle" Text="Выберите задание" FontWeight="SemiBold" FontSize="14"/>
                                 <TextBlock x:Name="FboJobStats" HorizontalAlignment="Right"/>
                             </DockPanel>
-                            <GroupBox Header="Активный короб (наклеить этикетку грузоместа)" DockPanel.Dock="Top" Margin="0,8" Padding="8">
+                            <GroupBox Header="Активное грузоместо (наклеить этикетку)" DockPanel.Dock="Top" Margin="0,8" Padding="8">
                                 <DockPanel>
                                     <Border DockPanel.Dock="Left" Width="110" Height="110" Background="#F3F3F3" BorderBrush="#CCC" BorderThickness="1" Margin="0,0,10,0">
                                         <Image x:Name="FboActiveImage" Stretch="Uniform"/>
@@ -223,7 +223,7 @@
                                             </DataGridTemplateColumn>
                                             <DataGridTextColumn Header="Артикул" Binding="{Binding Sku}" Width="100" ElementStyle="{StaticResource CellText}"/>
                                             <DataGridTextColumn Header="Название" Binding="{Binding Name}" Width="*" ElementStyle="{StaticResource CellText}"/>
-                                            <DataGridTextColumn Header="Короб" Binding="{Binding Order}" Width="130" ElementStyle="{StaticResource CellText}"/>
+                                            <DataGridTextColumn Header="Грузоместо" Binding="{Binding Order}" Width="130" ElementStyle="{StaticResource CellText}"/>
                                             <DataGridTextColumn Header="Статус" Binding="{Binding Status}" Width="100" ElementStyle="{StaticResource CellText}"/>
                                         </DataGrid.Columns>
                                     </DataGrid>
@@ -267,25 +267,25 @@
                                 <TextBlock x:Name="FboNewJobTitle" Text="Выберите задание" FontWeight="SemiBold" FontSize="14"/>
                                 <TextBlock x:Name="FboNewJobStats" HorizontalAlignment="Right"/>
                             </DockPanel>
-                            <GroupBox Header="Печать ШК коробов WB заранее" DockPanel.Dock="Top" Margin="0,8" Padding="8">
+                            <GroupBox Header="Печать ШК грузомест WB заранее" DockPanel.Dock="Top" Margin="0,8" Padding="8">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="Напечатать" VerticalAlignment="Center"/>
                                     <TextBox x:Name="FboNewPrintCount" Width="56" Margin="8,0" Text="10"/>
-                                    <TextBlock Text="ШК коробов" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <TextBlock Text="ШК грузомест" VerticalAlignment="Center" Margin="0,0,8,0"/>
                                     <Button Content="Печать" Click="OnFboNewPrintBoxes"/>
                                     <Button Content="Перепечатать последний" Click="OnFboNewReprintLast" Margin="8,0,0,0"/>
                                 </StackPanel>
                             </GroupBox>
-                            <GroupBox Header="Товар и короб WB" DockPanel.Dock="Top" Margin="0,0,0,8" Padding="8">
+                            <GroupBox Header="Товар и грузоместо" DockPanel.Dock="Top" Margin="0,0,0,8" Padding="8">
                                 <StackPanel>
-                                    <TextBlock x:Name="FboNewSelectedText" Text="Сначала пикните товар, затем ШК короба WB" TextWrapping="Wrap"/>
+                                    <TextBlock x:Name="FboNewSelectedText" Text="Сначала пикните товар, затем грузоместо" TextWrapping="Wrap"/>
                                     <TextBlock x:Name="FboNewQtyWarning" Text="" TextWrapping="Wrap"
                                                FontSize="20" FontWeight="Bold" Foreground="#C0392B"
                                                Margin="0,8,0,0" Visibility="Collapsed"/>
                                     <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                         <TextBlock Text="Кол-во" VerticalAlignment="Center"/>
                                         <TextBox x:Name="FboNewQtyBox" Width="72" Margin="8,0"/>
-                                        <CheckBox x:Name="FboNewRememberQty" Content="Задать количество для всех последующих коробов с этим SKU" VerticalAlignment="Center"/>
+                                        <CheckBox x:Name="FboNewRememberQty" Content="Задать количество для всех последующих грузомест с этим SKU" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </StackPanel>
                             </GroupBox>
