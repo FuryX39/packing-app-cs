@@ -128,6 +128,13 @@ public sealed class ApiClient : IDisposable
             code = code.Trim(),
         }, 20, ct);
 
+    public Task<JsonMap> AddCatalogBoxAsync(int productId, string barcode, int quantity, CancellationToken ct = default) =>
+        WebJsonAsync("POST", $"/api/warehouse/catalog/products/{productId}/boxes", new
+        {
+            barcode = barcode.Trim(),
+            quantity,
+        }, 20, ct);
+
     public async Task<List<JsonMap>> FbsMyJobsAsync(CancellationToken ct = default)
     {
         var body = await ApiJsonAsync("GET", "/api/v1/fbs-packing/my", null, 30, ct);

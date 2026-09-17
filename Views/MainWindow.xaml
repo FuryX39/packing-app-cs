@@ -392,6 +392,7 @@
                             <ContextMenu>
                                 <MenuItem Header="Печать ШК" Click="OnCatalogPrintMenu"/>
                                 <MenuItem Header="Добавить ШК" Click="OnCatalogAddBarcodeMenu"/>
+                                <MenuItem Header="Добавить ШК короба" Click="OnCatalogAddBoxMenu"/>
                                 <MenuItem Header="Добавить GTIN" Click="OnCatalogAddGtinMenu"/>
                             </ContextMenu>
                         </DataGrid.ContextMenu>

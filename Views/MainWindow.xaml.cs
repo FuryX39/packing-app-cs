@@ -643,6 +643,17 @@ public partial class MainWindow : Window
         await AddCatalogGtinAsync(row.Id);
     }
 
+    private async void OnCatalogAddBoxMenu(object sender, RoutedEventArgs e)
+    {
+        if (CatalogGrid.SelectedItem is not CatalogRow row)
+        {
+            SetStatus("Выберите товар в списке");
+            return;
+        }
+        SetStatus($"Добавление ШК короба: {row.Sku}...");
+        await AddCatalogBoxAsync(row.Id);
+    }
+
     /// Without a row under the cursor the menu would open and then do nothing.
     private void OnCatalogContextOpening(object sender, ContextMenuEventArgs e)
     {
@@ -784,6 +795,43 @@ public partial class MainWindow : Window
         catch (ApiException ex)
         {
             MessageBox.Show(this, ex.Message, "GTIN", MessageBoxButton.OK, MessageBoxImage.Error);
+            SetStatus(ex.Message);
+        }
+        catch (Exception ex) { ShowError(ex); }
+    }
+
+    private async Task AddCatalogBoxAsync(int productId)
+    {
+        var product = CatalogById(productId);
+        if (product is null)
+        {
+            MessageBox.Show(this, "Товар не найден — обновите список", "Нет товара");
+            return;
+        }
+        var dlg = new AddBoxWindow(product.Str("sku"), product.Str("name")) { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        SetStatus("Сохранение ШК короба...");
+        try
+        {
+            var payload = await _client.AddCatalogBoxAsync(productId, dlg.BarcodeText, dlg.Quantity);
+            var barcode = payload.Str("barcode");
+            if (barcode.Length == 0)
+                barcode = dlg.BarcodeText;
+            var qty = payload.Int("quantity");
+            if (qty <= 0)
+                qty = dlg.Quantity;
+            var action = payload.Str("action");
+            var sku = product.Str("sku");
+            SetStatus(action switch
+            {
+                "exists" => $"ШК короба {barcode} уже был у {sku}",
+                "updated" => $"ШК короба {barcode}: количество обновлено на {qty} у {sku}",
+                _ => $"ШК короба {barcode} ({qty} шт.) добавлен к {sku}",
+            });
+        }
+        catch (ApiException ex)
+        {
+            MessageBox.Show(this, ex.Message, "ШК короба", MessageBoxButton.OK, MessageBoxImage.Error);
             SetStatus(ex.Message);
         }
         catch (Exception ex) { ShowError(ex); }
