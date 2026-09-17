@@ -287,6 +287,10 @@
                                         <TextBox x:Name="FboNewQtyBox" Width="72" Margin="8,0"/>
                                         <CheckBox x:Name="FboNewRememberQty" Content="Задать количество для всех последующих грузомест с этим SKU" VerticalAlignment="Center"/>
                                     </StackPanel>
+                                    <StackPanel x:Name="FboNewProductionDatePanel" Orientation="Horizontal" Margin="0,8,0,0" Visibility="Collapsed">
+                                        <TextBlock Text="Дата производства" VerticalAlignment="Center"/>
+                                        <DatePicker x:Name="FboNewProductionDate" Width="150" Margin="8,0"/>
+                                    </StackPanel>
                                 </StackPanel>
                             </GroupBox>
                             <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">

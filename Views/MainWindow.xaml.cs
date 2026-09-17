@@ -91,6 +91,7 @@ public partial class MainWindow : Window
     private int _fboNewLastPrintedBoxId;
     private string _fboNewQtyWarning = "";
     private readonly Dictionary<string, int> _fboNewRememberedQty = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, DateTime> _fboNewProductionDates = new(StringComparer.OrdinalIgnoreCase);
     private readonly ObservableCollection<FbsJobRow> _fboNewJobRows = [];
     private readonly ObservableCollection<RemainingRow> _fboNewRemainingRows = [];
     private CancellationTokenSource? _fboNewOpenCts;

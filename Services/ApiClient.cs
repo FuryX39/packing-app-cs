@@ -253,13 +253,24 @@ public sealed class ApiClient : IDisposable
     public Task<JsonMap> FboSheetResolveAsync(int jobId, string barcode, CancellationToken ct = default) =>
         ApiJsonAsync("POST", $"/api/v1/fbo-sheet-packing/jobs/{jobId}/resolve", new { barcode }, 30, ct);
 
-    public Task<JsonMap> FboSheetAssignAsync(int jobId, string barcode, string productBarcode, int quantity, CancellationToken ct = default) =>
-        ApiJsonAsync("POST", $"/api/v1/fbo-sheet-packing/jobs/{jobId}/assign", new
+    public Task<JsonMap> FboSheetAssignAsync(
+        int jobId,
+        string barcode,
+        string productBarcode,
+        int quantity,
+        string? productionDate = null,
+        CancellationToken ct = default)
+    {
+        var body = new Dictionary<string, object?>
         {
-            barcode,
-            product_barcode = productBarcode,
-            quantity,
-        }, 30, ct);
+            ["barcode"] = barcode,
+            ["product_barcode"] = productBarcode,
+            ["quantity"] = quantity,
+        };
+        if (!string.IsNullOrWhiteSpace(productionDate))
+            body["production_date"] = productionDate.Trim();
+        return ApiJsonAsync("POST", $"/api/v1/fbo-sheet-packing/jobs/{jobId}/assign", body, 30, ct);
+    }
 
     public void Dispose()
     {

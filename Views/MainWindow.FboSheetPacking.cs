@@ -220,6 +220,7 @@ public partial class MainWindow
             qtyText = s.ToString();
         }
         FboNewQtyBox.Text = qtyText;
+        ApplyFboNewProductionDate(product);
         RefreshFboNewSelectedText();
         if (string.IsNullOrWhiteSpace(FboNewQtyBox.Text))
             FboNewQtyBox.Focus();
@@ -231,6 +232,7 @@ public partial class MainWindow
     {
         _fboNewProduct = null;
         FboNewQtyBox.Text = "";
+        ApplyFboNewProductionDate(null);
         RefreshFboNewSelectedText();
     }
 
@@ -239,6 +241,31 @@ public partial class MainWindow
         var raw = (FboNewQtyBox.Text ?? "").Trim();
         if (raw.Length == 0) return null;
         return int.TryParse(raw, out var n) ? n : null;
+    }
+
+    private void ApplyFboNewProductionDate(JsonMap? product)
+    {
+        var hasLife = product is not null && product.Flag("has_shelf_life");
+        FboNewProductionDatePanel.Visibility = hasLife ? Visibility.Visible : Visibility.Collapsed;
+        if (!hasLife || product is null)
+        {
+            FboNewProductionDate.SelectedDate = null;
+            return;
+        }
+        var barcode = product.Str("barcode");
+        var sku = product.Str("sku");
+        if (_fboNewProductionDates.TryGetValue(barcode, out var remembered) ||
+            (sku.Length > 0 && _fboNewProductionDates.TryGetValue(sku, out remembered)))
+            FboNewProductionDate.SelectedDate = remembered;
+        else
+            FboNewProductionDate.SelectedDate = null;
+    }
+
+    private string? ReadFboNewProductionDate()
+    {
+        if (FboNewProductionDatePanel.Visibility != Visibility.Visible)
+            return null;
+        return FboNewProductionDate.SelectedDate?.ToString("yyyy-MM-dd");
     }
 
     private async void OnFboNewPrintBoxes(object sender, RoutedEventArgs e)
@@ -341,9 +368,19 @@ public partial class MainWindow
                 var qty = ReadFboNewQty();
                 if (qty is null or <= 0)
                     throw new ApiException("Укажите количество товара в грузоместе");
+                if (_fboNewProduct.Flag("has_shelf_life") && string.IsNullOrWhiteSpace(ReadFboNewProductionDate()))
+                    throw new ApiException("Укажите дату производства");
                 var productBarcode = _fboNewProduct.Str("barcode");
-                var payload = await _client.FboSheetAssignAsync(jobId, code, productBarcode, qty.Value);
+                var productionDate = ReadFboNewProductionDate();
+                var payload = await _client.FboSheetAssignAsync(jobId, code, productBarcode, qty.Value, productionDate);
                 _fboNewJob = payload.Obj("job") ?? _fboNewJob;
+                if (FboNewProductionDate.SelectedDate is DateTime produced)
+                {
+                    _fboNewProductionDates[productBarcode] = produced;
+                    var producedSku = _fboNewProduct.Str("sku");
+                    if (producedSku.Length > 0)
+                        _fboNewProductionDates[producedSku] = produced;
+                }
                 if (FboNewRememberQty.IsChecked == true)
                 {
                     _fboNewRememberedQty[productBarcode] = qty.Value;
@@ -360,6 +397,7 @@ public partial class MainWindow
                 else
                 {
                     _fboNewProduct = remaining;
+                    ApplyFboNewProductionDate(remaining);
                     RefreshFboNewSelectedText();
                 }
                 RenderFboNewJob();
