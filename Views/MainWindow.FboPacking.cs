@@ -105,6 +105,8 @@ public partial class MainWindow
         SetStatus($"Открытие задания #{jobId}...");
         try
         {
+            _fboQtyWarning = "";
+            ApplyFboQtyWarning();
             var job = await _client.FboOpenJobAsync(jobId, cts.Token);
             if (!ReferenceEquals(_fboOpenCts, cts)) return;
             _fboJob = job;
@@ -167,6 +169,30 @@ public partial class MainWindow
         RenderFboLines();
         if (FboManualBox.IsChecked == true)
             RenderFboRemaining();
+        var fromActive = FboQtyWarnings(actives);
+        if (fromActive.Count > 0)
+            _fboQtyWarning = string.Join("\n", fromActive);
+        ApplyFboQtyWarning();
+    }
+
+    private static List<string> FboQtyWarnings(IEnumerable<JsonMap> lines) =>
+        lines.Select(l => l.Str("qty_warning").Trim()).Where(s => s.Length > 0).Distinct().ToList();
+
+    private void ApplyFboQtyWarning()
+    {
+        var text = (_fboQtyWarning ?? "").Trim();
+        FboQtyWarning.Text = text;
+        FboQtyWarning.Visibility = text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void ShowFboQtyWarningDialog(IReadOnlyList<string> warnings)
+    {
+        if (warnings.Count == 0) return;
+        var text = string.Join("\n", warnings.Where(s => !string.IsNullOrWhiteSpace(s)));
+        if (text.Length == 0) return;
+        _fboQtyWarning = text;
+        ApplyFboQtyWarning();
+        MessageBox.Show(this, text, "Нестандартный короб", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
     private void SetFboActiveImage(string url)
@@ -330,10 +356,14 @@ public partial class MainWindow
         }
         await FboRunAsync(async () =>
         {
+            var reprinted = (_fboJob?.Arr("lines") ?? [])
+                .Where(l => _fboLastScanLineIds.Contains(l.Int("id")))
+                .ToList();
             var pdfs = await ResolveFboPdfsAsync(jobId, _fboLastScanLineIds, null);
             if (pdfs.Count > 0)
                 await Task.Run(() => GdiPrinter.PrintPdfs(pdfs, _config.LabelProfile()));
             SetStatus($"Ярлык перепечатан ({pdfs.Count})");
+            ShowFboQtyWarningDialog(FboQtyWarnings(reprinted));
             FocusFboScan();
         }, "Перепечатка...");
     }
@@ -354,6 +384,7 @@ public partial class MainWindow
             if (pdfs.Count > 0)
                 await Task.Run(() => GdiPrinter.PrintPdfs(pdfs, _config.LabelProfile()));
             SetStatus($"На повторную печать: {pdfs.Count} ярл.");
+            ShowFboQtyWarningDialog(FboQtyWarnings(actives));
             FocusFboScan();
         }, "Перепечатка...");
     }
@@ -370,6 +401,7 @@ public partial class MainWindow
         {
             var payload = await _client.FboCancelPrintAsync(_fboJob.Int("id"), active.Int("id"));
             _fboJob = payload.Obj("job") ?? _fboJob;
+            _fboQtyWarning = "";
             RenderFboJob();
             SetStatus("Печать отменена");
             FocusFboScan();
@@ -463,6 +495,11 @@ public partial class MainWindow
             var payload = await worker();
             var lines = payload.Arr("lines");
             if (lines.Count == 0 && payload.Obj("line") is { } one) lines = [one];
+            var qtyWarnings = payload.StrList("qty_warnings");
+            if (qtyWarnings.Count == 0 && payload.Str("qty_warning").Length > 0)
+                qtyWarnings = [payload.Str("qty_warning")];
+            if (qtyWarnings.Count == 0)
+                qtyWarnings = FboQtyWarnings(lines);
             var payloadPdfs = payload.StrList("pdfs_base64");
             if (payloadPdfs.Count == 0 && payload.Str("pdf_base64").Length > 0)
                 payloadPdfs = [payload.Str("pdf_base64")];
@@ -497,8 +534,10 @@ public partial class MainWindow
             _fboLastScanCode = scanCode;
             _fboLastScanSku = lines.FirstOrDefault()?.Str("sku") ?? "";
             _fboLastScanLineIds = lineIds;
+            _fboQtyWarning = string.Join("\n", qtyWarnings);
             RenderFboJob();
             SetStatus(printed > 0 ? $"Напечатано этикеток: {printed}" : "Строка выделена");
+            ShowFboQtyWarningDialog(qtyWarnings);
             if (printError is not null) throw printError;
             if (closeError is not null) throw closeError;
             FocusFboScan();

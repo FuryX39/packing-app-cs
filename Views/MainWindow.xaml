@@ -150,6 +150,9 @@
                                     </Border>
                                     <StackPanel>
                                         <TextBlock x:Name="FboActiveText" Text="Нет активной строки — пикните товар" TextWrapping="Wrap"/>
+                                        <TextBlock x:Name="FboQtyWarning" Text="" TextWrapping="Wrap"
+                                                   FontSize="20" FontWeight="Bold" Foreground="#C0392B"
+                                                   Margin="0,8,0,0" Visibility="Collapsed"/>
                                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                             <Button Content="Перепечатать ярлык" Click="OnFboReprint"/>
                                             <Button Content="Отменить печать" Click="OnFboCancelPrint"/>
@@ -389,6 +392,7 @@
                             <ContextMenu>
                                 <MenuItem Header="Печать ШК" Click="OnCatalogPrintMenu"/>
                                 <MenuItem Header="Добавить ШК" Click="OnCatalogAddBarcodeMenu"/>
+                                <MenuItem Header="Добавить GTIN" Click="OnCatalogAddGtinMenu"/>
                             </ContextMenu>
                         </DataGrid.ContextMenu>
                         <DataGrid.Columns>

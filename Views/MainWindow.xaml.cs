@@ -79,6 +79,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _fboSelectTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private int _fboPendingJobId;
     private string _fboActiveImageUrl = "";
+    private string _fboQtyWarning = "";
 
     public MainWindow(AppConfig config, ApiClient client, string userName)
     {
@@ -631,6 +632,17 @@ public partial class MainWindow : Window
         await AddCatalogBarcodeAsync(row.Id);
     }
 
+    private async void OnCatalogAddGtinMenu(object sender, RoutedEventArgs e)
+    {
+        if (CatalogGrid.SelectedItem is not CatalogRow row)
+        {
+            SetStatus("Выберите товар в списке");
+            return;
+        }
+        SetStatus($"Добавление GTIN: {row.Sku}...");
+        await AddCatalogGtinAsync(row.Id);
+    }
+
     /// Without a row under the cursor the menu would open and then do nothing.
     private void OnCatalogContextOpening(object sender, ContextMenuEventArgs e)
     {
@@ -745,6 +757,33 @@ public partial class MainWindow : Window
         catch (ApiException ex)
         {
             MessageBox.Show(this, ex.Message, "Штрихкод", MessageBoxButton.OK, MessageBoxImage.Error);
+            SetStatus(ex.Message);
+        }
+        catch (Exception ex) { ShowError(ex); }
+    }
+
+    private async Task AddCatalogGtinAsync(int productId)
+    {
+        var product = CatalogById(productId);
+        if (product is null)
+        {
+            MessageBox.Show(this, "Товар не найден — обновите список", "Нет товара");
+            return;
+        }
+        var dlg = new AddGtinWindow(product.Str("sku"), product.Str("name")) { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        SetStatus("Сохранение GTIN...");
+        try
+        {
+            var payload = await _client.AddCatalogGtinAsync(productId, dlg.CodeText);
+            var gtin = payload.Str("gtin");
+            SetStatus(payload.Str("action") == "exists"
+                ? $"GTIN {gtin} уже был у {product.Str("sku")}"
+                : $"GTIN {gtin} добавлен к {product.Str("sku")}");
+        }
+        catch (ApiException ex)
+        {
+            MessageBox.Show(this, ex.Message, "GTIN", MessageBoxButton.OK, MessageBoxImage.Error);
             SetStatus(ex.Message);
         }
         catch (Exception ex) { ShowError(ex); }

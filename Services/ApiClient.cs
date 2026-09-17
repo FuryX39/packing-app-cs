@@ -122,6 +122,12 @@ public sealed class ApiClient : IDisposable
             group = group.Trim(),
         }, 20, ct);
 
+    public Task<JsonMap> AddCatalogGtinAsync(int productId, string code, CancellationToken ct = default) =>
+        WebJsonAsync("POST", $"/api/warehouse/catalog/products/{productId}/gtins", new
+        {
+            code = code.Trim(),
+        }, 20, ct);
+
     public async Task<List<JsonMap>> FbsMyJobsAsync(CancellationToken ct = default)
     {
         var body = await ApiJsonAsync("GET", "/api/v1/fbs-packing/my", null, 30, ct);
