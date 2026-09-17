@@ -232,6 +232,7 @@ public partial class MainWindow
     {
         _fboNewProduct = null;
         FboNewQtyBox.Text = "";
+        FboNewProductionDate.SelectedDate = null;
         RefreshFboNewSelectedText();
     }
 
@@ -244,18 +245,35 @@ public partial class MainWindow
 
     private void ApplyFboNewProductionDate(JsonMap? product)
     {
+        FboNewProductionDate.SelectedDate = RememberedProductionDate(product);
+    }
+
+    private DateTime? RememberedProductionDate(JsonMap? product)
+    {
         if (product is null)
-            return;
+            return null;
         var barcode = product.Str("barcode");
         var sku = product.Str("sku");
-        if (_fboNewProductionDates.TryGetValue(barcode, out var remembered) ||
-            (sku.Length > 0 && _fboNewProductionDates.TryGetValue(sku, out remembered)))
-            FboNewProductionDate.SelectedDate = remembered;
+        if (barcode.Length > 0 && _fboNewProductionDates.TryGetValue(barcode, out var remembered))
+            return remembered;
+        if (sku.Length > 0 && _fboNewProductionDates.TryGetValue(sku, out remembered))
+            return remembered;
+        return null;
     }
 
     private string? ReadFboNewProductionDate()
     {
         return FboNewProductionDate.SelectedDate?.ToString("yyyy-MM-dd");
+    }
+
+    private string? ProductionDateForAssign()
+    {
+        if (_fboNewProduct is null || !_fboNewProduct.Flag("has_shelf_life"))
+            return null;
+        var picked = ReadFboNewProductionDate();
+        if (!string.IsNullOrWhiteSpace(picked))
+            return picked;
+        return RememberedProductionDate(_fboNewProduct)?.ToString("yyyy-MM-dd");
     }
 
     private async void OnFboNewPrintBoxes(object sender, RoutedEventArgs e)
@@ -358,10 +376,8 @@ public partial class MainWindow
                 var qty = ReadFboNewQty();
                 if (qty is null or <= 0)
                     throw new ApiException("Укажите количество товара в грузоместе");
-                if (_fboNewProduct.Flag("has_shelf_life") && string.IsNullOrWhiteSpace(ReadFboNewProductionDate()))
-                    throw new ApiException("Укажите дату производства");
                 var productBarcode = _fboNewProduct.Str("barcode");
-                var productionDate = _fboNewProduct.Flag("has_shelf_life") ? ReadFboNewProductionDate() : null;
+                var productionDate = ProductionDateForAssign();
                 var payload = await _client.FboSheetAssignAsync(jobId, code, productBarcode, qty.Value, productionDate);
                 _fboNewJob = payload.Obj("job") ?? _fboNewJob;
                 if (FboNewProductionDate.SelectedDate is DateTime produced)
