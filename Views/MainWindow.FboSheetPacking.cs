@@ -232,7 +232,6 @@ public partial class MainWindow
     {
         _fboNewProduct = null;
         FboNewQtyBox.Text = "";
-        ApplyFboNewProductionDate(null);
         RefreshFboNewSelectedText();
     }
 
@@ -245,26 +244,17 @@ public partial class MainWindow
 
     private void ApplyFboNewProductionDate(JsonMap? product)
     {
-        var hasLife = product is not null && product.Flag("has_shelf_life");
-        FboNewProductionDatePanel.Visibility = hasLife ? Visibility.Visible : Visibility.Collapsed;
-        if (!hasLife || product is null)
-        {
-            FboNewProductionDate.SelectedDate = null;
+        if (product is null)
             return;
-        }
         var barcode = product.Str("barcode");
         var sku = product.Str("sku");
         if (_fboNewProductionDates.TryGetValue(barcode, out var remembered) ||
             (sku.Length > 0 && _fboNewProductionDates.TryGetValue(sku, out remembered)))
             FboNewProductionDate.SelectedDate = remembered;
-        else
-            FboNewProductionDate.SelectedDate = null;
     }
 
     private string? ReadFboNewProductionDate()
     {
-        if (FboNewProductionDatePanel.Visibility != Visibility.Visible)
-            return null;
         return FboNewProductionDate.SelectedDate?.ToString("yyyy-MM-dd");
     }
 
@@ -371,7 +361,7 @@ public partial class MainWindow
                 if (_fboNewProduct.Flag("has_shelf_life") && string.IsNullOrWhiteSpace(ReadFboNewProductionDate()))
                     throw new ApiException("Укажите дату производства");
                 var productBarcode = _fboNewProduct.Str("barcode");
-                var productionDate = ReadFboNewProductionDate();
+                var productionDate = _fboNewProduct.Flag("has_shelf_life") ? ReadFboNewProductionDate() : null;
                 var payload = await _client.FboSheetAssignAsync(jobId, code, productBarcode, qty.Value, productionDate);
                 _fboNewJob = payload.Obj("job") ?? _fboNewJob;
                 if (FboNewProductionDate.SelectedDate is DateTime produced)
