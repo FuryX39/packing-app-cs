@@ -232,6 +232,35 @@ public sealed class ApiClient : IDisposable
     public Task<byte[]> FboDownloadPalletSheetsAsync(int jobId, CancellationToken ct = default) =>
         ApiBytesAsync($"/api/v1/fbo-packing/jobs/{jobId}/pallet-sheets.pdf", 120, ct);
 
+    public async Task<List<JsonMap>> FboSheetMyJobsAsync(CancellationToken ct = default)
+    {
+        var body = await ApiJsonAsync("GET", "/api/v1/fbo-sheet-packing/my", null, 30, ct);
+        return body.Arr("jobs");
+    }
+
+    public async Task<JsonMap> FboSheetOpenJobAsync(int jobId, CancellationToken ct = default)
+    {
+        var body = await ApiJsonAsync("GET", $"/api/v1/fbo-sheet-packing/jobs/{jobId}/pack", null, 30, ct);
+        return body.Obj("job") ?? body;
+    }
+
+    public Task<JsonMap> FboSheetPrintBoxesAsync(int jobId, int count, CancellationToken ct = default) =>
+        ApiJsonAsync("POST", $"/api/v1/fbo-sheet-packing/jobs/{jobId}/print-boxes", new { count }, 60, ct);
+
+    public Task<JsonMap> FboSheetReprintBoxAsync(int jobId, int boxId, CancellationToken ct = default) =>
+        ApiJsonAsync("POST", $"/api/v1/fbo-sheet-packing/jobs/{jobId}/reprint-box", new { box_id = boxId }, 60, ct);
+
+    public Task<JsonMap> FboSheetResolveAsync(int jobId, string barcode, CancellationToken ct = default) =>
+        ApiJsonAsync("POST", $"/api/v1/fbo-sheet-packing/jobs/{jobId}/resolve", new { barcode }, 30, ct);
+
+    public Task<JsonMap> FboSheetAssignAsync(int jobId, string barcode, string productBarcode, int quantity, CancellationToken ct = default) =>
+        ApiJsonAsync("POST", $"/api/v1/fbo-sheet-packing/jobs/{jobId}/assign", new
+        {
+            barcode,
+            product_barcode = productBarcode,
+            quantity,
+        }, 30, ct);
+
     public void Dispose()
     {
         _web.Dispose();

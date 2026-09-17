@@ -81,6 +81,21 @@ public partial class MainWindow : Window
     private string _fboActiveImageUrl = "";
     private string _fboQtyWarning = "";
 
+    private bool _fboNewBusy;
+    private bool _fboNewJobsFilling;
+    private List<JsonMap> _fboNewJobs = [];
+    private JsonMap? _fboNewJob;
+    private JsonMap? _fboNewProduct;
+    private int _fboNewJobsPage;
+    private int _fboNewPendingJobId;
+    private int _fboNewLastPrintedBoxId;
+    private string _fboNewQtyWarning = "";
+    private readonly Dictionary<string, int> _fboNewRememberedQty = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ObservableCollection<FbsJobRow> _fboNewJobRows = [];
+    private readonly ObservableCollection<RemainingRow> _fboNewRemainingRows = [];
+    private CancellationTokenSource? _fboNewOpenCts;
+    private readonly DispatcherTimer _fboNewSelectTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
+
     public MainWindow(AppConfig config, ApiClient client, string userName)
     {
         InitializeComponent();
@@ -103,10 +118,12 @@ public partial class MainWindow : Window
         FboJobsGrid.ItemsSource = _fboJobRows;
         FboLinesGrid.ItemsSource = _fboLineRows;
         FboRemainingGrid.ItemsSource = _fboRemainingRows;
+        FboNewJobsGrid.ItemsSource = _fboNewJobRows;
+        FboNewRemainingGrid.ItemsSource = _fboNewRemainingRows;
 
         _tasksTimer.Tick += (_, _) =>
         {
-            if (Tabs.SelectedIndex == 3)
+            if (Tabs.SelectedIndex == 4)
                 _ = LoadTasksAsync(true);
         };
         _fbsSelectTimer.Tick += (_, _) =>
@@ -121,6 +138,12 @@ public partial class MainWindow : Window
             if (_fboPendingJobId > 0)
                 _ = OpenFboJobAsync(_fboPendingJobId);
         };
+        _fboNewSelectTimer.Tick += (_, _) =>
+        {
+            _fboNewSelectTimer.Stop();
+            if (_fboNewPendingJobId > 0)
+                _ = OpenFboNewJobAsync(_fboNewPendingJobId);
+        };
         Loaded += async (_, _) => await LoadFboJobsAsync();
     }
 
@@ -131,8 +154,10 @@ public partial class MainWindow : Window
         _tasksTimer.Stop();
         _fbsSelectTimer.Stop();
         _fboSelectTimer.Stop();
+        _fboNewSelectTimer.Stop();
         _fbsOpenCts?.Cancel();
         _fboOpenCts?.Cancel();
+        _fboNewOpenCts?.Cancel();
         await _client.LogoutAsync();
         _client.Dispose();
     }
@@ -166,9 +191,13 @@ public partial class MainWindow : Window
                 break;
             case 1:
                 _tasksTimer.Stop();
-                _ = LoadFbsJobsAsync();
+                _ = LoadFboNewJobsAsync();
                 break;
             case 2:
+                _tasksTimer.Stop();
+                _ = LoadFbsJobsAsync();
+                break;
+            case 3:
                 _tasksTimer.Stop();
                 _ = LoadCatalogAsync(false);
                 break;
@@ -179,7 +208,7 @@ public partial class MainWindow : Window
     {
         _tasksTimer.Stop();
         _tasksTimer.Interval = TimeSpan.FromMilliseconds(_config.RefreshMs);
-        if (Tabs.SelectedIndex == 3)
+        if (Tabs.SelectedIndex == 4)
             _tasksTimer.Start();
     }
 
