@@ -73,3 +73,11 @@ public sealed class RemainingRow : PhotoRow
     public string Qty { get; init; } = "";
     public string Barcode { get; init; } = "";
 }
+
+public sealed class FboOverviewGroupRow
+{
+    public string Title { get; init; } = "";
+    public IReadOnlyList<string> Lines { get; init; } = [];
+    public bool IsEmpty => Lines.Count == 0;
+    public string EmptyText { get; init; } = "Пусто";
+}

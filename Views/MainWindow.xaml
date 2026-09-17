@@ -243,7 +243,8 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="260" MinWidth="200"/>
                             <ColumnDefinition Width="6"/>
-                            <ColumnDefinition Width="*" MinWidth="480"/>
+                            <ColumnDefinition Width="*" MinWidth="360"/>
+                            <ColumnDefinition x:Name="FboNewOverviewCol" Width="0"/>
                         </Grid.ColumnDefinitions>
                         <DockPanel>
                             <TextBlock DockPanel.Dock="Top" Text="Мои задания FBO WB new" Margin="0,0,0,4"/>
@@ -264,8 +265,10 @@
                         <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Stretch"/>
                         <DockPanel Grid.Column="2">
                             <DockPanel DockPanel.Dock="Top">
+                                <Button DockPanel.Dock="Right" x:Name="FboNewOverviewToggle"
+                                        Content="Сводка" Click="OnFboNewOverviewToggle" Padding="10,2" Margin="8,0,0,0"/>
                                 <TextBlock x:Name="FboNewJobTitle" Text="Выберите задание" FontWeight="SemiBold" FontSize="14"/>
-                                <TextBlock x:Name="FboNewJobStats" HorizontalAlignment="Right"/>
+                                <TextBlock x:Name="FboNewJobStats" HorizontalAlignment="Right" Margin="8,0"/>
                             </DockPanel>
                             <GroupBox Header="Печать ШК грузомест WB заранее" DockPanel.Dock="Top" Margin="0,8" Padding="8">
                                 <StackPanel Orientation="Horizontal">
@@ -314,6 +317,80 @@
                                 </DataGrid>
                             </GroupBox>
                         </DockPanel>
+                        <Border Grid.Column="3" x:Name="FboNewOverviewPanel" Visibility="Collapsed"
+                                BorderBrush="#DDD" BorderThickness="1,0,0,0" Background="White" Padding="8,0,0,0">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Top" Text="Грузоместа" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                <TabControl>
+                                    <TabItem Header="Товары">
+                                        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,8,0,0">
+                                            <ItemsControl x:Name="FboNewByProductList">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Expander Header="{Binding Title}" Margin="0,0,0,6">
+                                                            <StackPanel Margin="12,4,0,4">
+                                                                <TextBlock Text="{Binding EmptyText}" Foreground="#888" Margin="0,2">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding IsEmpty}" Value="True">
+                                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                                <ItemsControl ItemsSource="{Binding Lines}">
+                                                                    <ItemsControl.ItemTemplate>
+                                                                        <DataTemplate>
+                                                                            <TextBlock Text="{Binding}" Margin="0,2" TextWrapping="Wrap"/>
+                                                                        </DataTemplate>
+                                                                    </ItemsControl.ItemTemplate>
+                                                                </ItemsControl>
+                                                            </StackPanel>
+                                                        </Expander>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                    </TabItem>
+                                    <TabItem Header="Грузоместа">
+                                        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,8,0,0">
+                                            <ItemsControl x:Name="FboNewByCargoList">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Expander Header="{Binding Title}" Margin="0,0,0,6">
+                                                            <StackPanel Margin="12,4,0,4">
+                                                                <TextBlock Text="{Binding EmptyText}" Foreground="#888" Margin="0,2">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding IsEmpty}" Value="True">
+                                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                                <ItemsControl ItemsSource="{Binding Lines}">
+                                                                    <ItemsControl.ItemTemplate>
+                                                                        <DataTemplate>
+                                                                            <TextBlock Text="{Binding}" Margin="0,2" TextWrapping="Wrap"/>
+                                                                        </DataTemplate>
+                                                                    </ItemsControl.ItemTemplate>
+                                                                </ItemsControl>
+                                                            </StackPanel>
+                                                        </Expander>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                    </TabItem>
+                                </TabControl>
+                            </DockPanel>
+                        </Border>
                     </Grid>
                 </DockPanel>
             </TabItem>

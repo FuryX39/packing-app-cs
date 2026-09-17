@@ -94,6 +94,9 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, DateTime> _fboNewProductionDates = new(StringComparer.OrdinalIgnoreCase);
     private readonly ObservableCollection<FbsJobRow> _fboNewJobRows = [];
     private readonly ObservableCollection<RemainingRow> _fboNewRemainingRows = [];
+    private readonly ObservableCollection<FboOverviewGroupRow> _fboNewByProductRows = [];
+    private readonly ObservableCollection<FboOverviewGroupRow> _fboNewByCargoRows = [];
+    private bool _fboNewOverviewOpen;
     private CancellationTokenSource? _fboNewOpenCts;
     private readonly DispatcherTimer _fboNewSelectTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
 
@@ -121,6 +124,8 @@ public partial class MainWindow : Window
         FboRemainingGrid.ItemsSource = _fboRemainingRows;
         FboNewJobsGrid.ItemsSource = _fboNewJobRows;
         FboNewRemainingGrid.ItemsSource = _fboNewRemainingRows;
+        FboNewByProductList.ItemsSource = _fboNewByProductRows;
+        FboNewByCargoList.ItemsSource = _fboNewByCargoRows;
 
         _tasksTimer.Tick += (_, _) =>
         {
