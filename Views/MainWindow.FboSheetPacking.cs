@@ -257,14 +257,17 @@ public partial class MainWindow
 
     private void ApplyFboNewProduct(JsonMap product, int? suggestedQty)
     {
+        var previousBarcode = _fboNewProduct?.Str("barcode") ?? "";
+        var barcode = product.Str("barcode");
+        var sku = product.Str("sku");
+        var sameProduct = previousBarcode.Length > 0 &&
+            previousBarcode.Equals(barcode, StringComparison.OrdinalIgnoreCase);
         _fboNewProduct = product;
         FboNewQtyPanel.Visibility = Visibility.Visible;
         _fboNewQtyWarning = "";
         ApplyFboNewQtyWarning();
-        if (string.IsNullOrWhiteSpace(FboNewQtyBox.Text))
+        if (!sameProduct)
         {
-            var barcode = product.Str("barcode");
-            var sku = product.Str("sku");
             var qtyText = "";
             if (FboNewRememberQty.IsChecked == true &&
                 (_fboNewRememberedQty.TryGetValue(barcode, out var remembered) ||
@@ -277,6 +280,10 @@ public partial class MainWindow
                 qtyText = s.ToString();
             }
             FboNewQtyBox.Text = qtyText;
+        }
+        else if (suggestedQty is int s && s > 0)
+        {
+            FboNewQtyBox.Text = s.ToString();
         }
         ApplyFboNewProductionDate(product);
         RefreshFboNewSelectedText();
@@ -558,16 +565,12 @@ public partial class MainWindow
                 var warning = payload.Str("qty_warning");
                 var remaining = (_fboNewJob?.Arr("remaining_groups") ?? [])
                     .FirstOrDefault(g => g.Str("barcode").Equals(productBarcode, StringComparison.OrdinalIgnoreCase));
-                if (remaining is null)
-                    ClearFboNewProduct();
-                else
-                {
+                if (remaining is not null)
                     _fboNewProduct = remaining;
-                    ApplyFboNewProductionDate(remaining);
-                    if (FboNewRememberQty.IsChecked != true)
-                        FboNewQtyBox.Text = "";
-                    RefreshFboNewSelectedText();
-                }
+                else
+                    SyncFboNewSelectedProduct();
+                ApplyFboNewProductionDate(_fboNewProduct);
+                RefreshFboNewSelectedText();
                 RenderFboNewJob();
                 RenderFboNewJobs();
                 ShowFboNewQtyWarningDialog(warning);
