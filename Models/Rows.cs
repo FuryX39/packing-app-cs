@@ -80,7 +80,9 @@ public sealed class FboOverviewLineRow
     public int BoxId { get; init; }
     public string BoxCode { get; init; } = "";
     public string ProductBarcode { get; init; } = "";
+    public string PalletCode { get; init; } = "";
     public bool CanUnassign { get; init; }
+    public bool CanUnbindPallet { get; init; }
 }
 
 public sealed class FboOverviewGroupRow
@@ -92,5 +94,7 @@ public sealed class FboOverviewGroupRow
     public int BoxId { get; init; }
     public string BoxCode { get; init; } = "";
     public string ProductBarcode { get; init; } = "";
+    public string PalletCode { get; init; } = "";
     public bool CanUnassign { get; init; }
+    public bool CanUnbindPallet { get; init; }
 }

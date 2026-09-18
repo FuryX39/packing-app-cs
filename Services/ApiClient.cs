@@ -292,6 +292,15 @@ public sealed class ApiClient : IDisposable
             product_barcode = productBarcode ?? "",
         }, 30, ct);
 
+    public Task<JsonMap> FboSheetUnbindPalletAsync(
+        int jobId,
+        int boxId,
+        CancellationToken ct = default) =>
+        ApiJsonAsync("POST", $"/api/v1/fbo-sheet-packing/jobs/{jobId}/unbind-pallet", new
+        {
+            box_id = boxId,
+        }, 30, ct);
+
     public void Dispose()
     {
         _web.Dispose();

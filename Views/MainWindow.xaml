@@ -94,7 +94,8 @@
         </Style>
 
         <ContextMenu x:Key="FboNewUnassignMenu" x:Shared="False">
-            <MenuItem Header="Снять привязку к грузоместу" Click="OnFboNewUnassignClick"/>
+            <MenuItem Header="Снять привязку к грузоместу" Tag="unassign" Click="OnFboNewUnassignClick"/>
+            <MenuItem Header="Снять привязку к паллету" Tag="pallet" Click="OnFboNewUnbindPalletClick"/>
         </ContextMenu>
         <Style x:Key="FboNewOverviewLine" TargetType="TextBlock">
             <Setter Property="Margin" Value="0,2"/>

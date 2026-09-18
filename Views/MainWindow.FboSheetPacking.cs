@@ -620,37 +620,77 @@ public partial class MainWindow
 
     private void OnFboNewUnassignContextOpening(object sender, ContextMenuEventArgs e)
     {
-        if (!CanUnassignOverview((sender as FrameworkElement)?.DataContext))
+        var host = sender as FrameworkElement;
+        var data = host?.DataContext;
+        var menu = host?.ContextMenu;
+        if (menu is null)
+            return;
+        var unassign = CanUnassignOverview(data);
+        var unbindPallet = CanUnbindPalletOverview(data);
+        if (!unassign && !unbindPallet)
+        {
             e.Handled = true;
+            return;
+        }
+        foreach (var item in menu.Items.OfType<MenuItem>())
+        {
+            var tag = item.Tag as string;
+            item.Visibility = tag switch
+            {
+                "unassign" => unassign ? Visibility.Visible : Visibility.Collapsed,
+                "pallet" => unbindPallet ? Visibility.Visible : Visibility.Collapsed,
+                _ => Visibility.Visible,
+            };
+        }
     }
 
     private static bool CanUnassignOverview(object? data) =>
         (data is FboOverviewLineRow line && line.CanUnassign)
         || (data is FboOverviewGroupRow group && group.CanUnassign);
 
-    private async void OnFboNewUnassignClick(object sender, RoutedEventArgs e)
+    private static bool CanUnbindPalletOverview(object? data) =>
+        (data is FboOverviewLineRow line && line.CanUnbindPallet)
+        || (data is FboOverviewGroupRow group && group.CanUnbindPallet);
+
+    private static bool TryOverviewBox(object? data, out int boxId, out string boxCode, out string productBarcode, out string palletCode)
     {
-        var data = ((sender as MenuItem)?.Parent as ContextMenu)?.PlacementTarget is FrameworkElement target
-            ? target.DataContext
-            : (sender as FrameworkElement)?.DataContext;
-        int boxId;
-        string boxCode;
-        string productBarcode;
-        if (data is FboOverviewLineRow line && line.CanUnassign)
+        if (data is FboOverviewLineRow line && line.BoxId > 0)
         {
             boxId = line.BoxId;
             boxCode = line.BoxCode;
             productBarcode = line.ProductBarcode;
+            palletCode = line.PalletCode;
+            return true;
         }
-        else if (data is FboOverviewGroupRow group && group.CanUnassign)
+        if (data is FboOverviewGroupRow group && group.BoxId > 0)
         {
             boxId = group.BoxId;
             boxCode = group.BoxCode;
             productBarcode = group.ProductBarcode;
+            palletCode = group.PalletCode;
+            return true;
         }
-        else
+        boxId = 0;
+        boxCode = "";
+        productBarcode = "";
+        palletCode = "";
+        return false;
+    }
+
+    private static object? OverviewMenuData(object sender)
+    {
+        return ((sender as MenuItem)?.Parent as ContextMenu)?.PlacementTarget is FrameworkElement target
+            ? target.DataContext
+            : (sender as FrameworkElement)?.DataContext;
+    }
+
+    private async void OnFboNewUnassignClick(object sender, RoutedEventArgs e)
+    {
+        var data = OverviewMenuData(sender);
+        if (!TryOverviewBox(data, out var boxId, out var boxCode, out var productBarcode, out _) ||
+            !CanUnassignOverview(data))
             return;
-        if (_fboNewJob is null || boxId <= 0)
+        if (_fboNewJob is null)
             return;
         var jobId = _fboNewJob.Int("id");
         var confirm = string.IsNullOrWhiteSpace(productBarcode)
@@ -668,6 +708,31 @@ public partial class MainWindow
             SetStatus($"Снята привязка с грузоместа {boxCode}");
             FocusFboNewScan();
         }, "Снятие привязки...");
+    }
+
+    private async void OnFboNewUnbindPalletClick(object sender, RoutedEventArgs e)
+    {
+        var data = OverviewMenuData(sender);
+        if (!TryOverviewBox(data, out var boxId, out var boxCode, out _, out var palletCode) ||
+            !CanUnbindPalletOverview(data))
+            return;
+        if (_fboNewJob is null)
+            return;
+        var jobId = _fboNewJob.Int("id");
+        var confirm = palletCode.Length > 0
+            ? $"Снять привязку грузоместа {boxCode} к паллету {palletCode}?"
+            : $"Снять привязку грузоместа {boxCode} к паллету?";
+        if (MessageBox.Show(this, confirm, "FBO WB new", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+        await FboNewRunAsync(async () =>
+        {
+            var payload = await _client.FboSheetUnbindPalletAsync(jobId, boxId);
+            _fboNewJob = payload.Obj("job") ?? _fboNewJob;
+            RenderFboNewJob();
+            RenderFboNewJobs();
+            SetStatus($"Снята привязка грузоместа {boxCode} к паллету");
+            FocusFboNewScan();
+        }, "Снятие привязки к паллету...");
     }
 
     private void SyncFboNewSelectedProduct()
@@ -744,7 +809,9 @@ public partial class MainWindow
                 EmptyText = "Пусто",
                 BoxId = box.Int("id"),
                 BoxCode = box.Str("box_id"),
+                PalletCode = box.Str("pallet_human_id"),
                 CanUnassign = BoxHasItems(box),
+                CanUnbindPallet = BoxHasPallet(box),
             });
         }
 
@@ -833,6 +900,9 @@ public partial class MainWindow
         }
     }
 
+    private static bool BoxHasPallet(JsonMap box) =>
+        box.Int("pallet_id") > 0 || box.Str("pallet_human_id").Length > 0;
+
     private static FboOverviewLineRow OverviewLine(string text, JsonMap box, string productBarcode, bool canUnassign)
     {
         return new FboOverviewLineRow
@@ -841,7 +911,9 @@ public partial class MainWindow
             BoxId = box.Int("id"),
             BoxCode = box.Str("box_id"),
             ProductBarcode = productBarcode,
+            PalletCode = box.Str("pallet_human_id"),
             CanUnassign = canUnassign && box.Int("id") > 0,
+            CanUnbindPallet = BoxHasPallet(box) && box.Int("id") > 0,
         };
     }
 
