@@ -235,10 +235,18 @@
             </TabItem>
             <TabItem Header="FBO WB new">
                 <DockPanel Margin="6">
-                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                        <Button DockPanel.Dock="Left" Content="Обновить" Click="OnReloadFboNew"/>
-                        <TextBlock x:Name="FboNewApiHint" VerticalAlignment="Center" Margin="12,0,0,0"/>
-                    </DockPanel>
+                    <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Content="Обновить" Click="OnReloadFboNew"/>
+                        <TextBlock Grid.Column="1" x:Name="FboNewApiHint" VerticalAlignment="Center" Margin="12,0"/>
+                        <Button Grid.Column="2" x:Name="FboNewOverviewHeaderBtn"
+                                Content="Грузоместа" Click="OnFboNewOverviewToggle"
+                                Padding="16,6" FontWeight="SemiBold" MinWidth="140"/>
+                    </Grid>
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="260" MinWidth="200"/>
@@ -265,41 +273,50 @@
                         <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Stretch"/>
                         <DockPanel Grid.Column="2">
                             <DockPanel DockPanel.Dock="Top">
-                                <Button DockPanel.Dock="Right" x:Name="FboNewOverviewToggle"
-                                        Content="Сводка" Click="OnFboNewOverviewToggle" Padding="10,2" Margin="8,0,0,0"/>
                                 <TextBlock x:Name="FboNewJobTitle" Text="Выберите задание" FontWeight="SemiBold" FontSize="14"/>
                                 <TextBlock x:Name="FboNewJobStats" HorizontalAlignment="Right" Margin="8,0"/>
                             </DockPanel>
-                            <GroupBox Header="Печать ШК грузомест WB заранее" DockPanel.Dock="Top" Margin="0,8" Padding="8">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="Напечатать" VerticalAlignment="Center"/>
-                                    <TextBox x:Name="FboNewPrintCount" Width="56" Margin="8,0" Text="10"/>
-                                    <TextBlock Text="ШК грузомест" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                    <Button Content="Печать" Click="OnFboNewPrintBoxes"/>
-                                    <Button Content="Перепечатать последний" Click="OnFboNewReprintLast" Margin="8,0,0,0"/>
-                                </StackPanel>
-                            </GroupBox>
-                            <GroupBox Header="Товар и грузоместо" DockPanel.Dock="Top" Margin="0,0,0,8" Padding="8">
+                            <GroupBox Header="Печать ШК заранее" DockPanel.Dock="Top" Margin="0,8,0,8" Padding="8">
                                 <StackPanel>
-                                    <TextBlock x:Name="FboNewSelectedText" Text="Сначала пикните товар, затем грузоместо" TextWrapping="Wrap"/>
-                                    <TextBlock x:Name="FboNewQtyWarning" Text="" TextWrapping="Wrap"
-                                               FontSize="20" FontWeight="Bold" Foreground="#C0392B"
-                                               Margin="0,8,0,0" Visibility="Collapsed"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="Грузоместа" VerticalAlignment="Center" Width="80"/>
+                                        <TextBox x:Name="FboNewPrintCount" Width="48" Margin="8,0" Text="10"/>
+                                        <Button Content="Печать" Click="OnFboNewPrintBoxes"/>
+                                        <Button Content="Перепечатать последний" Click="OnFboNewReprintLast" Margin="8,0,0,0"/>
+                                    </StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                        <TextBlock Text="Кол-во" VerticalAlignment="Center"/>
-                                        <TextBox x:Name="FboNewQtyBox" Width="72" Margin="8,0"/>
-                                        <TextBlock Text="Дата производства" VerticalAlignment="Center" Margin="16,0,0,0"/>
-                                        <DatePicker x:Name="FboNewProductionDate" Width="150" Margin="8,0"/>
-                                        <CheckBox x:Name="FboNewRememberQty" Content="Задать количество для всех последующих грузомест с этим SKU" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                                        <TextBlock Text="Паллеты" VerticalAlignment="Center" Width="80"/>
+                                        <TextBox x:Name="FboNewPalletPrintCount" Width="48" Margin="8,0" Text="5"/>
+                                        <Button Content="Печать" Click="OnFboNewPrintPallets"/>
+                                        <Button Content="Перепечатать последний" Click="OnFboNewReprintLastPallet" Margin="8,0,0,0"/>
                                     </StackPanel>
                                 </StackPanel>
                             </GroupBox>
                             <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                                <Button DockPanel.Dock="Right" x:Name="FboNewClosePalletBtn"
+                                        Content="Закрыть паллет" Click="OnFboNewClosePallet" Padding="12,4"/>
+                                <TextBlock x:Name="FboNewPalletText" Text="Сначала пикните паллет" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                            </DockPanel>
+                            <TextBlock x:Name="FboNewSelectedText" DockPanel.Dock="Top" Text="Пикните паллет" TextWrapping="Wrap" FontSize="15" Margin="0,0,0,8"/>
+                            <TextBlock x:Name="FboNewQtyWarning" DockPanel.Dock="Top" Text="" TextWrapping="Wrap"
+                                       FontSize="20" FontWeight="Bold" Foreground="#C0392B"
+                                       Margin="0,0,0,8" Visibility="Collapsed"/>
+                            <StackPanel x:Name="FboNewQtyPanel" DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8" Visibility="Collapsed">
+                                <TextBlock Text="Кол-во" VerticalAlignment="Center"/>
+                                <TextBox x:Name="FboNewQtyBox" Width="72" Margin="8,0"/>
+                                <TextBlock Text="Дата производства" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                                <DatePicker x:Name="FboNewProductionDate" Width="150" Margin="8,0"/>
+                                <CheckBox x:Name="FboNewRememberQty" Content="Количество для всех последующих грузомест с этим SKU" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                            </StackPanel>
+                            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                                 <TextBlock Text="Сканер" VerticalAlignment="Center"/>
                                 <Button DockPanel.Dock="Right" Content="OK" Click="OnFboNewScan"/>
-                                <TextBox x:Name="FboNewScanBox" Margin="8,0" KeyDown="OnFboNewScanKey"/>
+                                <TextBox x:Name="FboNewScanBox" Margin="8,0" FontSize="18" Height="32" KeyDown="OnFboNewScanKey"/>
                             </DockPanel>
-                            <GroupBox Header="Остаток к раскладке" >
+                            <CheckBox x:Name="FboNewManualBox" DockPanel.Dock="Top" Content="Ручная сборка (остаток + ШК с экрана)"
+                                      Click="OnFboNewManualToggle" Margin="0,0,0,8"/>
+                            <GroupBox x:Name="FboNewManualPanel" Header="Остаток к раскладке" DockPanel.Dock="Top"
+                                      Height="220" Margin="0,0,0,8" Visibility="Collapsed">
                                 <DataGrid x:Name="FboNewRemainingGrid" Style="{StaticResource RowLinesGrid}"
                                           MouseDoubleClick="OnFboNewRemainingDoubleClick">
                                     <DataGrid.Columns>
@@ -313,6 +330,7 @@
                                         <DataGridTextColumn Header="Артикул" Binding="{Binding Sku}" Width="100" ElementStyle="{StaticResource CellText}"/>
                                         <DataGridTextColumn Header="Название" Binding="{Binding Name}" Width="*" ElementStyle="{StaticResource CellText}"/>
                                         <DataGridTextColumn Header="Осталось" Binding="{Binding Qty}" Width="80" ElementStyle="{StaticResource CellText}"/>
+                                        <DataGridTextColumn Header="ШК" Binding="{Binding Barcode}" Width="140" ElementStyle="{StaticResource CellText}"/>
                                     </DataGrid.Columns>
                                 </DataGrid>
                             </GroupBox>
@@ -358,6 +376,39 @@
                                     <TabItem Header="Грузоместа">
                                         <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,8,0,0">
                                             <ItemsControl x:Name="FboNewByCargoList">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Expander Header="{Binding Title}" Margin="0,0,0,6">
+                                                            <StackPanel Margin="12,4,0,4">
+                                                                <TextBlock Text="{Binding EmptyText}" Foreground="#888" Margin="0,2">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding IsEmpty}" Value="True">
+                                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                                <ItemsControl ItemsSource="{Binding Lines}">
+                                                                    <ItemsControl.ItemTemplate>
+                                                                        <DataTemplate>
+                                                                            <TextBlock Text="{Binding}" Margin="0,2" TextWrapping="Wrap"/>
+                                                                        </DataTemplate>
+                                                                    </ItemsControl.ItemTemplate>
+                                                                </ItemsControl>
+                                                            </StackPanel>
+                                                        </Expander>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                    </TabItem>
+                                    <TabItem Header="Паллеты">
+                                        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,8,0,0">
+                                            <ItemsControl x:Name="FboNewByPalletList">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <Expander Header="{Binding Title}" Margin="0,0,0,6">

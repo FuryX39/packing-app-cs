@@ -1,6 +1,8 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using WarehousePacking.Models;
 using WarehousePacking.Services;
 
@@ -105,6 +107,13 @@ public partial class MainWindow
         try
         {
             _fboNewQtyWarning = "";
+            _fboNewClosingPallet = false;
+            if (_fboNewJob?.IntOrNull("id") != jobId)
+            {
+                _fboNewLastPrintedBoxId = 0;
+                _fboNewLastPrintedPalletId = 0;
+                ClearFboNewProduct();
+            }
             ApplyFboNewQtyWarning();
             var job = await _client.FboSheetOpenJobAsync(jobId, cts.Token);
             if (!ReferenceEquals(_fboNewOpenCts, cts)) return;
@@ -137,8 +146,9 @@ public partial class MainWindow
         var total = job?.Int("box_total") ?? 0;
         var printed = job?.Int("box_printed") ?? 0;
         var pending = job?.Int("box_pending") ?? 0;
+        var pallets = job is null ? "" : $" · паллеты {job.Int("pallet_closed")}/{job.Int("pallet_total")}";
         var pcs = job is null ? "" : $" · шт. {job.Int("pcs_assigned")}/{job.Int("pcs_plan")}";
-        FboNewJobStats.Text = $"грузоместа {assigned}/{total} · напечатано {printed} · не печатались {pending}{pcs}";
+        FboNewJobStats.Text = $"грузоместа {assigned}/{total} · напечатано {printed} · не печатались {pending}{pallets}{pcs}";
         RefreshFboNewSelectedText();
         RenderFboNewRemaining();
         RenderFboNewOverview();
@@ -168,16 +178,59 @@ public partial class MainWindow
     private void OnFboNewRemainingDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (FboNewRemainingGrid.SelectedItem is not RemainingRow row) return;
+        if (_fboNewJob?.Obj("open_pallet") is null)
+        {
+            MessageBox.Show(this, "Сначала пикните паллет", "FBO WB new");
+            return;
+        }
         var groups = _fboNewJob?.Arr("remaining_groups") ?? [];
         if (row.Index < 0 || row.Index >= groups.Count) return;
         ApplyFboNewProduct(groups[row.Index], null);
     }
 
+    private void OnFboNewManualToggle(object sender, RoutedEventArgs e)
+    {
+        FboNewManualPanel.Visibility = FboNewManualBox.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        if (FboNewManualBox.IsChecked == true)
+            RenderFboNewRemaining();
+        FocusFboNewScan();
+    }
+
+    private void RefreshFboNewPalletText()
+    {
+        var open = _fboNewJob?.Obj("open_pallet");
+        if (_fboNewClosingPallet && open is not null)
+        {
+            FboNewPalletText.Text = $"Закрытие паллета {open.Str("pallet_id")} — пикните его ШК";
+            FboNewClosePalletBtn.Content = "Отмена";
+            return;
+        }
+        FboNewClosePalletBtn.Content = "Закрыть паллет";
+        if (open is null)
+        {
+            FboNewPalletText.Text = "Сначала пикните паллет";
+            return;
+        }
+        var boxes = open.Int("box_count");
+        FboNewPalletText.Text = $"Паллет {open.Str("pallet_id")} · грузомест {boxes}";
+    }
+
     private void RefreshFboNewSelectedText()
     {
+        RefreshFboNewPalletText();
+        if (_fboNewClosingPallet)
+        {
+            FboNewSelectedText.Text = "Пикните ШК открытого паллета, чтобы закрыть его";
+            return;
+        }
+        if (_fboNewJob?.Obj("open_pallet") is null)
+        {
+            FboNewSelectedText.Text = "Пикните паллет";
+            return;
+        }
         if (_fboNewProduct is null)
         {
-            FboNewSelectedText.Text = "Сначала пикните товар, затем грузоместо";
+            FboNewSelectedText.Text = "Пикните товар, затем грузоместо";
             return;
         }
         var sku = _fboNewProduct.Str("sku");
@@ -205,6 +258,7 @@ public partial class MainWindow
     private void ApplyFboNewProduct(JsonMap product, int? suggestedQty)
     {
         _fboNewProduct = product;
+        FboNewQtyPanel.Visibility = Visibility.Visible;
         _fboNewQtyWarning = "";
         ApplyFboNewQtyWarning();
         if (string.IsNullOrWhiteSpace(FboNewQtyBox.Text))
@@ -237,6 +291,7 @@ public partial class MainWindow
         _fboNewProduct = null;
         FboNewQtyBox.Text = "";
         FboNewProductionDate.SelectedDate = null;
+        FboNewQtyPanel.Visibility = Visibility.Collapsed;
         RefreshFboNewSelectedText();
     }
 
@@ -332,6 +387,70 @@ public partial class MainWindow
         }, "Перепечатка...");
     }
 
+    private async void OnFboNewPrintPallets(object sender, RoutedEventArgs e)
+    {
+        if (_fboNewJob is null)
+        {
+            MessageBox.Show(this, "Сначала откройте задание", "FBO WB new");
+            return;
+        }
+        if (!int.TryParse((FboNewPalletPrintCount.Text ?? "").Trim(), out var count) || count <= 0)
+        {
+            MessageBox.Show(this, "Укажите, сколько ШК паллет напечатать", "FBO WB new");
+            return;
+        }
+        var jobId = _fboNewJob.Int("id");
+        await FboNewRunAsync(async () =>
+        {
+            var payload = await _client.FboSheetPrintPalletsAsync(jobId, count);
+            _fboNewJob = payload.Obj("job") ?? _fboNewJob;
+            var pallets = payload.Arr("pallets");
+            if (pallets.Count > 0)
+                _fboNewLastPrintedPalletId = pallets[^1].Int("id");
+            var pdfs = DecodeFboNewPdfs(payload);
+            if (pdfs.Count > 0)
+                await Task.Run(() => GdiPrinter.PrintPdfs(pdfs, _config.LabelProfile()));
+            RenderFboNewJob();
+            RenderFboNewJobs();
+            SetStatus($"Напечатано ШК паллет: {pdfs.Count}");
+            FocusFboNewScan();
+        }, "Печать ШК паллет...");
+    }
+
+    private async void OnFboNewReprintLastPallet(object sender, RoutedEventArgs e)
+    {
+        if (_fboNewJob is null || _fboNewLastPrintedPalletId <= 0)
+        {
+            MessageBox.Show(this, "Нет последнего напечатанного ШК паллета", "FBO WB new");
+            return;
+        }
+        var jobId = _fboNewJob.Int("id");
+        var palletId = _fboNewLastPrintedPalletId;
+        await FboNewRunAsync(async () =>
+        {
+            var payload = await _client.FboSheetReprintPalletAsync(jobId, palletId);
+            _fboNewJob = payload.Obj("job") ?? _fboNewJob;
+            var pdfs = DecodeFboNewPdfs(payload);
+            if (pdfs.Count > 0)
+                await Task.Run(() => GdiPrinter.PrintPdfs(pdfs, _config.LabelProfile()));
+            RenderFboNewJob();
+            SetStatus("Ярлык паллета перепечатан");
+            FocusFboNewScan();
+        }, "Перепечатка паллета...");
+    }
+
+    private void OnFboNewClosePallet(object sender, RoutedEventArgs e)
+    {
+        if (_fboNewJob?.Obj("open_pallet") is null)
+        {
+            MessageBox.Show(this, "Сначала пикните паллет", "FBO WB new");
+            return;
+        }
+        _fboNewClosingPallet = !_fboNewClosingPallet;
+        RefreshFboNewSelectedText();
+        FocusFboNewScan();
+    }
+
     private static List<byte[]> DecodeFboNewPdfs(JsonMap payload)
     {
         var encoded = payload.StrList("pdfs_base64");
@@ -362,10 +481,31 @@ public partial class MainWindow
         var jobId = _fboNewJob.Int("id");
         await FboNewRunAsync(async () =>
         {
+            if (_fboNewClosingPallet)
+            {
+                var closed = await _client.FboSheetClosePalletAsync(jobId, code);
+                _fboNewJob = closed.Obj("job") ?? await _client.FboSheetOpenJobAsync(jobId);
+                _fboNewClosingPallet = false;
+                RenderFboNewJob();
+                RenderFboNewJobs();
+                SetStatus($"Паллет {closed.Obj("pallet")?.Str("pallet_id") ?? ""} закрыт");
+                FocusFboNewScan();
+                return;
+            }
             var resolved = await _client.FboSheetResolveAsync(jobId, code);
             var kind = resolved.Str("kind");
+            if (kind == "pallet")
+            {
+                _fboNewJob = resolved.Obj("job") ?? await _client.FboSheetOpenJobAsync(jobId);
+                RenderFboNewJob();
+                SetStatus($"Паллет {resolved.Obj("pallet")?.Str("pallet_id") ?? ""}");
+                FocusFboNewScan();
+                return;
+            }
             if (kind == "product")
             {
+                if (_fboNewJob?.Obj("open_pallet") is null)
+                    throw new ApiException("Сначала пикните паллет");
                 var product = resolved.Obj("product");
                 if (product is null)
                     throw new ApiException("Товар не распознан");
@@ -375,6 +515,8 @@ public partial class MainWindow
             }
             if (kind == "wb_box")
             {
+                if (_fboNewJob?.Obj("open_pallet") is null)
+                    throw new ApiException("Сначала пикните паллет");
                 if (_fboNewProduct is null)
                     throw new ApiException("Сначала пикните товар, затем грузоместо");
                 var qty = ReadFboNewQty();
@@ -457,7 +599,7 @@ public partial class MainWindow
         _fboNewOverviewOpen = !_fboNewOverviewOpen;
         FboNewOverviewCol.Width = new GridLength(_fboNewOverviewOpen ? 380 : 0);
         FboNewOverviewPanel.Visibility = _fboNewOverviewOpen ? Visibility.Visible : Visibility.Collapsed;
-        FboNewOverviewToggle.Content = _fboNewOverviewOpen ? "Скрыть" : "Сводка";
+        FboNewOverviewHeaderBtn.Content = _fboNewOverviewOpen ? "Скрыть грузоместа" : "Грузоместа";
         if (_fboNewOverviewOpen)
             RenderFboNewOverview();
     }
@@ -480,8 +622,18 @@ public partial class MainWindow
             if (name.Length > 0 && name != title)
                 title += $" · {name}";
             var lines = new List<string>();
+            var dates = new List<string>();
             foreach (var box in boxes)
-                lines.AddRange(CargoLinesForBarcode(box, barcode));
+            {
+                foreach (var line in CargoLinesForBarcode(box, barcode))
+                    lines.Add(line);
+                foreach (var date in ItemDatesForBarcode(box, barcode))
+                {
+                    if (!dates.Exists(x => x.Equals(date, StringComparison.OrdinalIgnoreCase)))
+                        dates.Add(date);
+                }
+            }
+            title = AppendDates(title, dates);
             _fboNewByProductRows.Add(new FboOverviewGroupRow
             {
                 Title = title,
@@ -506,14 +658,59 @@ public partial class MainWindow
                 EmptyText = "Пусто",
             });
         }
+
+        _fboNewByPalletRows.Clear();
+        foreach (var pallet in job.Arr("pallets"))
+        {
+            var palletId = pallet.Int("id");
+            var human = pallet.Str("pallet_id");
+            var lines = new List<string>();
+            foreach (var box in boxes)
+            {
+                var onPallet = box.Int("pallet_id") == palletId ||
+                    (human.Length > 0 && box.Str("pallet_human_id").Equals(human, StringComparison.OrdinalIgnoreCase));
+                if (!onPallet) continue;
+                var productLines = CargoProductLines(box);
+                if (productLines.Count == 0)
+                    lines.Add(BoxTitle(box, includePallet: false));
+                else
+                    foreach (var line in productLines)
+                        lines.Add($"{BoxTitle(box, includePallet: false)} · {line}");
+            }
+            _fboNewByPalletRows.Add(new FboOverviewGroupRow
+            {
+                Title = PalletTitle(pallet),
+                Lines = lines,
+                EmptyText = "Нет грузомест",
+            });
+        }
     }
 
-    private static string BoxTitle(JsonMap box)
+    private static string PalletTitle(JsonMap pallet)
+    {
+        var id = pallet.Str("pallet_id");
+        if (id.Length == 0) id = $"№{pallet.Int("seq")}";
+        var status = PalletStatusRu(pallet.Str("status"));
+        var boxes = pallet.Int("box_count");
+        return $"{id} · {status} · грузомест {boxes}";
+    }
+
+    private static string PalletStatusRu(string status) => status switch
+    {
+        "open" => "открыт",
+        "closed" => "закрыт",
+        "printed" => "напечатан",
+        _ => status,
+    };
+
+    private static string BoxTitle(JsonMap box, bool includePallet = true)
     {
         var id = box.Str("box_id");
         if (id.Length == 0) id = box.Str("order_display");
         if (id.Length == 0) id = $"№{box.Int("seq")}";
-        return id;
+        if (!includePallet) return id;
+        var pallet = box.Str("pallet_human_id");
+        return pallet.Length > 0 ? $"{id} · {pallet}" : id;
     }
 
     private static bool BoxHasItems(JsonMap box)
@@ -522,61 +719,94 @@ public partial class MainWindow
         return box.Str("product_barcode").Length > 0 && box.Int("quantity") > 0;
     }
 
-    private static List<string> CargoLinesForBarcode(JsonMap box, string barcode)
+    private static IEnumerable<JsonMap> ItemsForBarcode(JsonMap box, string barcode)
     {
-        if (barcode.Length == 0) return [];
-        var lines = new List<string>();
+        if (barcode.Length == 0) yield break;
+        var found = false;
         foreach (var item in box.Arr("items"))
         {
             if (!item.Str("product_barcode").Equals(barcode, StringComparison.OrdinalIgnoreCase))
                 continue;
-            lines.Add(FormatCargoQtyLine(box, item.Int("quantity", item.Int("item_qty")), item.Str("expiry")));
+            found = true;
+            yield return item;
         }
-        if (lines.Count == 0 &&
+        if (!found &&
             box.Str("product_barcode").Equals(barcode, StringComparison.OrdinalIgnoreCase) &&
             box.Int("quantity") > 0)
         {
-            lines.Add(FormatCargoQtyLine(box, box.Int("quantity"), ""));
+            yield return box;
+        }
+    }
+
+    private static List<string> CargoLinesForBarcode(JsonMap box, string barcode)
+    {
+        var lines = new List<string>();
+        foreach (var item in ItemsForBarcode(box, barcode))
+        {
+            var qty = item.Int("quantity", item.Int("item_qty"));
+            if (qty <= 0)
+                qty = box.Int("quantity");
+            lines.Add(AppendDate(
+                qty > 0 ? $"{BoxTitle(box)} · {qty} шт." : BoxTitle(box),
+                item.Str("expiry")));
         }
         return lines;
     }
 
-    private static string FormatCargoQtyLine(JsonMap box, int qty, string expiry)
+    private static List<string> ItemDatesForBarcode(JsonMap box, string barcode)
     {
-        var text = qty > 0 ? $"{BoxTitle(box)} · {qty} шт." : BoxTitle(box);
-        if (expiry.Length > 0)
-            text += $" · {expiry}";
-        return text;
+        var dates = new List<string>();
+        foreach (var item in ItemsForBarcode(box, barcode))
+        {
+            var date = DisplayDate(item.Str("expiry"));
+            if (date.Length > 0 && !dates.Exists(x => x.Equals(date, StringComparison.OrdinalIgnoreCase)))
+                dates.Add(date);
+        }
+        return dates;
     }
 
     private static List<string> CargoProductLines(JsonMap box)
     {
         var lines = new List<string>();
         foreach (var item in box.Arr("items"))
-        {
-            var sku = item.Str("sku");
-            var name = item.Str("product_name", sku);
-            var label = sku.Length > 0 ? sku : item.Str("product_barcode");
-            if (name.Length > 0 && name != label)
-                label += $" · {name}";
-            var qty = item.Int("quantity", item.Int("item_qty"));
-            if (qty > 0)
-                label += $" · {qty} шт.";
-            var expiry = item.Str("expiry");
-            if (expiry.Length > 0)
-                label += $" · {expiry}";
-            lines.Add(label);
-        }
+            lines.Add(ProductLine(item));
         if (lines.Count == 0 && box.Str("product_barcode").Length > 0 && box.Int("quantity") > 0)
-        {
-            var sku = box.Str("sku");
-            var name = box.Str("product_name", sku);
-            var label = sku.Length > 0 ? sku : box.Str("product_barcode");
-            if (name.Length > 0 && name != label)
-                label += $" · {name}";
-            label += $" · {box.Int("quantity")} шт.";
-            lines.Add(label);
-        }
+            lines.Add(ProductLine(box));
         return lines;
+    }
+
+    private static string ProductLine(JsonMap item)
+    {
+        var sku = item.Str("sku");
+        var name = item.Str("product_name", sku);
+        var label = sku.Length > 0 ? sku : item.Str("product_barcode");
+        if (name.Length > 0 && name != label)
+            label += $" · {name}";
+        var qty = item.Int("quantity", item.Int("item_qty"));
+        if (qty > 0)
+            label += $" · {qty} шт.";
+        return AppendDate(label, item.Str("expiry"));
+    }
+
+    private static string AppendDates(string label, IReadOnlyList<string> dates)
+    {
+        if (dates.Count == 0) return label;
+        return $"{label} · {string.Join(", ", dates)}";
+    }
+
+    private static string AppendDate(string label, string expiry)
+    {
+        var date = DisplayDate(expiry);
+        return date.Length > 0 ? $"{label} · {date}" : label;
+    }
+
+    private static string DisplayDate(string raw)
+    {
+        var text = (raw ?? "").Trim();
+        if (text.Length == 0) return "";
+        string[] formats = ["dd.MM.yyyy", "yyyy-MM-dd", "dd/MM/yyyy", "dd-MM-yyyy"];
+        if (DateTime.TryParseExact(text, formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+            return dt.ToString("dd.MM.yyyy");
+        return text;
     }
 }
