@@ -212,7 +212,7 @@ public partial class MainWindow
             return;
         }
         var boxes = open.Int("box_count");
-        FboNewPalletText.Text = $"Паллет {open.Str("pallet_id")} · грузомест {boxes}";
+        FboNewPalletText.Text = $"Паллет {open.Str("pallet_id")} · грузомест {boxes}. Повторный пик закрывает паллет.";
     }
 
     private void RefreshFboNewSelectedText()
@@ -496,9 +496,23 @@ public partial class MainWindow
             var kind = resolved.Str("kind");
             if (kind == "pallet")
             {
+                _fboNewClosingPallet = false;
                 _fboNewJob = resolved.Obj("job") ?? await _client.FboSheetOpenJobAsync(jobId);
                 RenderFboNewJob();
-                SetStatus($"Паллет {resolved.Obj("pallet")?.Str("pallet_id") ?? ""}");
+                var palletId = resolved.Obj("pallet")?.Str("pallet_id") ?? "";
+                var action = resolved.Str("action");
+                if (action == "closed")
+                    SetStatus($"Паллет {palletId} закрыт");
+                else if (action == "reopened")
+                {
+                    var warning = resolved.Str("warning");
+                    if (warning.Length == 0)
+                        warning = "Этот паллет открыт повторно";
+                    MessageBox.Show(this, warning, "FBO WB new", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    SetStatus($"Паллет {palletId} открыт повторно");
+                }
+                else
+                    SetStatus($"Паллет {palletId}");
                 FocusFboNewScan();
                 return;
             }
