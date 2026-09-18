@@ -74,10 +74,23 @@ public sealed class RemainingRow : PhotoRow
     public string Barcode { get; init; } = "";
 }
 
+public sealed class FboOverviewLineRow
+{
+    public string Text { get; init; } = "";
+    public int BoxId { get; init; }
+    public string BoxCode { get; init; } = "";
+    public string ProductBarcode { get; init; } = "";
+    public bool CanUnassign { get; init; }
+}
+
 public sealed class FboOverviewGroupRow
 {
     public string Title { get; init; } = "";
-    public IReadOnlyList<string> Lines { get; init; } = [];
+    public IReadOnlyList<FboOverviewLineRow> Lines { get; init; } = [];
     public bool IsEmpty => Lines.Count == 0;
     public string EmptyText { get; init; } = "Пусто";
+    public int BoxId { get; init; }
+    public string BoxCode { get; init; } = "";
+    public string ProductBarcode { get; init; } = "";
+    public bool CanUnassign { get; init; }
 }

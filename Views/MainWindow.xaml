@@ -92,6 +92,45 @@
             <Setter Property="Margin" Value="0,3"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
+
+        <ContextMenu x:Key="FboNewUnassignMenu" x:Shared="False">
+            <MenuItem Header="Снять привязку к грузоместу" Click="OnFboNewUnassignClick"/>
+        </ContextMenu>
+        <Style x:Key="FboNewOverviewLine" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="0,2"/>
+        </Style>
+        <DataTemplate x:Key="FboNewOverviewGroupTemplate">
+            <Expander Header="{Binding Title}" Margin="0,0,0,6"
+                      ContextMenu="{StaticResource FboNewUnassignMenu}"
+                      ContextMenuOpening="OnFboNewUnassignContextOpening">
+                <StackPanel Margin="12,4,0,4">
+                    <TextBlock Text="{Binding EmptyText}" Foreground="#888" Margin="0,2">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsEmpty}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <ItemsControl ItemsSource="{Binding Lines}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Text}" Style="{StaticResource FboNewOverviewLine}"
+                                           ContextMenu="{StaticResource FboNewUnassignMenu}"
+                                           ContextMenuOpening="OnFboNewUnassignContextOpening"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Expander>
+        </DataTemplate>
     </Window.Resources>
 
     <DockPanel>
@@ -342,101 +381,20 @@
                                 <TabControl>
                                     <TabItem Header="Товары">
                                         <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,8,0,0">
-                                            <ItemsControl x:Name="FboNewByProductList">
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <Expander Header="{Binding Title}" Margin="0,0,0,6">
-                                                            <StackPanel Margin="12,4,0,4">
-                                                                <TextBlock Text="{Binding EmptyText}" Foreground="#888" Margin="0,2">
-                                                                    <TextBlock.Style>
-                                                                        <Style TargetType="TextBlock">
-                                                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                                                            <Style.Triggers>
-                                                                                <DataTrigger Binding="{Binding IsEmpty}" Value="True">
-                                                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                                                </DataTrigger>
-                                                                            </Style.Triggers>
-                                                                        </Style>
-                                                                    </TextBlock.Style>
-                                                                </TextBlock>
-                                                                <ItemsControl ItemsSource="{Binding Lines}">
-                                                                    <ItemsControl.ItemTemplate>
-                                                                        <DataTemplate>
-                                                                            <TextBlock Text="{Binding}" Margin="0,2" TextWrapping="Wrap"/>
-                                                                        </DataTemplate>
-                                                                    </ItemsControl.ItemTemplate>
-                                                                </ItemsControl>
-                                                            </StackPanel>
-                                                        </Expander>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
+                                            <ItemsControl x:Name="FboNewByProductList"
+                                                          ItemTemplate="{StaticResource FboNewOverviewGroupTemplate}"/>
                                         </ScrollViewer>
                                     </TabItem>
                                     <TabItem Header="Грузоместа">
                                         <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,8,0,0">
-                                            <ItemsControl x:Name="FboNewByCargoList">
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <Expander Header="{Binding Title}" Margin="0,0,0,6">
-                                                            <StackPanel Margin="12,4,0,4">
-                                                                <TextBlock Text="{Binding EmptyText}" Foreground="#888" Margin="0,2">
-                                                                    <TextBlock.Style>
-                                                                        <Style TargetType="TextBlock">
-                                                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                                                            <Style.Triggers>
-                                                                                <DataTrigger Binding="{Binding IsEmpty}" Value="True">
-                                                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                                                </DataTrigger>
-                                                                            </Style.Triggers>
-                                                                        </Style>
-                                                                    </TextBlock.Style>
-                                                                </TextBlock>
-                                                                <ItemsControl ItemsSource="{Binding Lines}">
-                                                                    <ItemsControl.ItemTemplate>
-                                                                        <DataTemplate>
-                                                                            <TextBlock Text="{Binding}" Margin="0,2" TextWrapping="Wrap"/>
-                                                                        </DataTemplate>
-                                                                    </ItemsControl.ItemTemplate>
-                                                                </ItemsControl>
-                                                            </StackPanel>
-                                                        </Expander>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
+                                            <ItemsControl x:Name="FboNewByCargoList"
+                                                          ItemTemplate="{StaticResource FboNewOverviewGroupTemplate}"/>
                                         </ScrollViewer>
                                     </TabItem>
                                     <TabItem Header="Паллеты">
                                         <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,8,0,0">
-                                            <ItemsControl x:Name="FboNewByPalletList">
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <Expander Header="{Binding Title}" Margin="0,0,0,6">
-                                                            <StackPanel Margin="12,4,0,4">
-                                                                <TextBlock Text="{Binding EmptyText}" Foreground="#888" Margin="0,2">
-                                                                    <TextBlock.Style>
-                                                                        <Style TargetType="TextBlock">
-                                                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                                                            <Style.Triggers>
-                                                                                <DataTrigger Binding="{Binding IsEmpty}" Value="True">
-                                                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                                                </DataTrigger>
-                                                                            </Style.Triggers>
-                                                                        </Style>
-                                                                    </TextBlock.Style>
-                                                                </TextBlock>
-                                                                <ItemsControl ItemsSource="{Binding Lines}">
-                                                                    <ItemsControl.ItemTemplate>
-                                                                        <DataTemplate>
-                                                                            <TextBlock Text="{Binding}" Margin="0,2" TextWrapping="Wrap"/>
-                                                                        </DataTemplate>
-                                                                    </ItemsControl.ItemTemplate>
-                                                                </ItemsControl>
-                                                            </StackPanel>
-                                                        </Expander>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
+                                            <ItemsControl x:Name="FboNewByPalletList"
+                                                          ItemTemplate="{StaticResource FboNewOverviewGroupTemplate}"/>
                                         </ScrollViewer>
                                     </TabItem>
                                 </TabControl>

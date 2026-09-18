@@ -604,6 +604,78 @@ public partial class MainWindow
             RenderFboNewOverview();
     }
 
+    private void OnFboNewUnassignContextOpening(object sender, ContextMenuEventArgs e)
+    {
+        if (!CanUnassignOverview((sender as FrameworkElement)?.DataContext))
+            e.Handled = true;
+    }
+
+    private static bool CanUnassignOverview(object? data) =>
+        (data is FboOverviewLineRow line && line.CanUnassign)
+        || (data is FboOverviewGroupRow group && group.CanUnassign);
+
+    private async void OnFboNewUnassignClick(object sender, RoutedEventArgs e)
+    {
+        var data = ((sender as MenuItem)?.Parent as ContextMenu)?.PlacementTarget is FrameworkElement target
+            ? target.DataContext
+            : (sender as FrameworkElement)?.DataContext;
+        int boxId;
+        string boxCode;
+        string productBarcode;
+        if (data is FboOverviewLineRow line && line.CanUnassign)
+        {
+            boxId = line.BoxId;
+            boxCode = line.BoxCode;
+            productBarcode = line.ProductBarcode;
+        }
+        else if (data is FboOverviewGroupRow group && group.CanUnassign)
+        {
+            boxId = group.BoxId;
+            boxCode = group.BoxCode;
+            productBarcode = group.ProductBarcode;
+        }
+        else
+            return;
+        if (_fboNewJob is null || boxId <= 0)
+            return;
+        var jobId = _fboNewJob.Int("id");
+        var confirm = string.IsNullOrWhiteSpace(productBarcode)
+            ? $"Снять все товары с грузоместа {boxCode}?"
+            : $"Снять привязку товара к грузоместу {boxCode}?";
+        if (MessageBox.Show(this, confirm, "FBO WB new", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+        await FboNewRunAsync(async () =>
+        {
+            var payload = await _client.FboSheetUnassignAsync(jobId, boxId, productBarcode);
+            _fboNewJob = payload.Obj("job") ?? _fboNewJob;
+            SyncFboNewSelectedProduct();
+            RenderFboNewJob();
+            RenderFboNewJobs();
+            SetStatus($"Снята привязка с грузоместа {boxCode}");
+            FocusFboNewScan();
+        }, "Снятие привязки...");
+    }
+
+    private void SyncFboNewSelectedProduct()
+    {
+        if (_fboNewProduct is null || _fboNewJob is null)
+            return;
+        var barcode = _fboNewProduct.Str("barcode");
+        if (barcode.Length == 0)
+            return;
+        var remaining = _fboNewJob.Arr("remaining_groups")
+            .FirstOrDefault(item => item.Str("barcode").Equals(barcode, StringComparison.OrdinalIgnoreCase));
+        if (remaining is not null)
+        {
+            _fboNewProduct = remaining;
+            return;
+        }
+        var product = _fboNewJob.Arr("products")
+            .FirstOrDefault(item => item.Str("barcode").Equals(barcode, StringComparison.OrdinalIgnoreCase));
+        if (product is not null)
+            _fboNewProduct = product;
+    }
+
     private void RenderFboNewOverview()
     {
         _fboNewByProductRows.Clear();
@@ -621,7 +693,7 @@ public partial class MainWindow
             var title = sku.Length > 0 ? sku : barcode;
             if (name.Length > 0 && name != title)
                 title += $" · {name}";
-            var lines = new List<string>();
+            var lines = new List<FboOverviewLineRow>();
             var dates = new List<string>();
             foreach (var box in boxes)
             {
@@ -656,6 +728,9 @@ public partial class MainWindow
                 Title = BoxTitle(box),
                 Lines = CargoProductLines(box),
                 EmptyText = "Пусто",
+                BoxId = box.Int("id"),
+                BoxCode = box.Str("box_id"),
+                CanUnassign = BoxHasItems(box),
             });
         }
 
@@ -664,7 +739,7 @@ public partial class MainWindow
         {
             var palletId = pallet.Int("id");
             var human = pallet.Str("pallet_id");
-            var lines = new List<string>();
+            var lines = new List<FboOverviewLineRow>();
             foreach (var box in boxes)
             {
                 var onPallet = box.Int("pallet_id") == palletId ||
@@ -672,10 +747,16 @@ public partial class MainWindow
                 if (!onPallet) continue;
                 var productLines = CargoProductLines(box);
                 if (productLines.Count == 0)
-                    lines.Add(BoxTitle(box, includePallet: false));
+                    lines.Add(OverviewLine(BoxTitle(box, includePallet: false), box, "", canUnassign: false));
                 else
                     foreach (var line in productLines)
-                        lines.Add($"{BoxTitle(box, includePallet: false)} · {line}");
+                    {
+                        lines.Add(OverviewLine(
+                            $"{BoxTitle(box, includePallet: false)} · {line.Text}",
+                            box,
+                            line.ProductBarcode,
+                            canUnassign: line.CanUnassign));
+                    }
             }
             _fboNewByPalletRows.Add(new FboOverviewGroupRow
             {
@@ -738,17 +819,30 @@ public partial class MainWindow
         }
     }
 
-    private static List<string> CargoLinesForBarcode(JsonMap box, string barcode)
+    private static FboOverviewLineRow OverviewLine(string text, JsonMap box, string productBarcode, bool canUnassign)
     {
-        var lines = new List<string>();
+        return new FboOverviewLineRow
+        {
+            Text = text,
+            BoxId = box.Int("id"),
+            BoxCode = box.Str("box_id"),
+            ProductBarcode = productBarcode,
+            CanUnassign = canUnassign && box.Int("id") > 0,
+        };
+    }
+
+    private static List<FboOverviewLineRow> CargoLinesForBarcode(JsonMap box, string barcode)
+    {
+        var lines = new List<FboOverviewLineRow>();
         foreach (var item in ItemsForBarcode(box, barcode))
         {
             var qty = item.Int("quantity", item.Int("item_qty"));
             if (qty <= 0)
                 qty = box.Int("quantity");
-            lines.Add(AppendDate(
+            var text = AppendDate(
                 qty > 0 ? $"{BoxTitle(box)} · {qty} шт." : BoxTitle(box),
-                item.Str("expiry")));
+                item.Str("expiry"));
+            lines.Add(OverviewLine(text, box, barcode, canUnassign: true));
         }
         return lines;
     }
@@ -765,13 +859,19 @@ public partial class MainWindow
         return dates;
     }
 
-    private static List<string> CargoProductLines(JsonMap box)
+    private static List<FboOverviewLineRow> CargoProductLines(JsonMap box)
     {
-        var lines = new List<string>();
+        var lines = new List<FboOverviewLineRow>();
         foreach (var item in box.Arr("items"))
-            lines.Add(ProductLine(item));
+        {
+            var barcode = item.Str("product_barcode");
+            lines.Add(OverviewLine(ProductLine(item), box, barcode, canUnassign: barcode.Length > 0));
+        }
         if (lines.Count == 0 && box.Str("product_barcode").Length > 0 && box.Int("quantity") > 0)
-            lines.Add(ProductLine(box));
+        {
+            var barcode = box.Str("product_barcode");
+            lines.Add(OverviewLine(ProductLine(box), box, barcode, canUnassign: true));
+        }
         return lines;
     }
 
