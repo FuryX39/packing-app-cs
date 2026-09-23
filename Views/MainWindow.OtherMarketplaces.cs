@@ -252,7 +252,7 @@ public partial class MainWindow
 
     private async void OnOmScanKey(object sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Enter) return;
+        if (e.Key != Key.Enter && e.Key != Key.Return) return;
         e.Handled = true;
         await ScanOmAsync();
     }
@@ -274,8 +274,21 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            SetStatus(ex.Message);
+            var text = string.IsNullOrWhiteSpace(ex.Message)
+                ? $"Штрихкод «{code}» не принят"
+                : ex.Message;
+            ShowOmScanWarning(text, "Сканер", replaceActive: true);
         }
+    }
+
+    private void ShowOmScanWarning(string text, string title, bool replaceActive)
+    {
+        OmScanWarning.Text = text;
+        if (replaceActive)
+            OmActiveText.Text = text;
+        SetStatus(text);
+        MessageBox.Show(this, text, title, MessageBoxButton.OK, MessageBoxImage.Warning);
+        OmScanBox.Focus();
     }
 
     private async void OnOmRemainingPick(object sender, RoutedEventArgs e)
@@ -307,7 +320,10 @@ public partial class MainWindow
         RenderOmJob();
         var copies = result.Int("barcode_copies");
         var barcode = result.Str("barcode");
-        var mismatch = result.Flag("mismatch") ? " ШК не из файла поставки, записан в лист несовпадений." : "";
+        var warning = result.Str("warning");
+        var mismatch = result.Flag("mismatch");
+        if (mismatch && string.IsNullOrWhiteSpace(warning))
+            warning = $"Штрихкода «{barcode}» нет в файле поставки. Строка принята, код записан в лист несовпадений.";
         var lineId = result.Int("line_id");
         var line = (_omJob?.Arr("lines") ?? []).FirstOrDefault(item => item.Int("id") == lineId);
         var sku = line?.Str("sku") ?? "";
@@ -325,10 +341,14 @@ public partial class MainWindow
                 await Task.Run(() => GdiPrinter.PrintPdf(pdf, _config.LabelProfile(), copies));
             });
         }
-        SetStatus(copies > 0
-            ? $"ШК поставки {barcode}: {copies} шт.{mismatch}"
-            : $"Строка отмечена.{mismatch}");
-        OmScanBox.Focus();
+        if (mismatch)
+            ShowOmScanWarning(warning, "Штрихкод не из поставки", replaceActive: false);
+        else
+        {
+            OmScanWarning.Text = "";
+            SetStatus(copies > 0 ? $"ШК поставки {barcode}: {copies} шт." : "Строка отмечена");
+            OmScanBox.Focus();
+        }
     }
 
     private JsonMap? SelectedOmLine()

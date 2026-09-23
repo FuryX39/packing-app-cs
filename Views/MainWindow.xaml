@@ -684,6 +684,7 @@
                                 </DockPanel>
                             </GroupBox>
                             <TextBlock x:Name="OmCisHint" DockPanel.Dock="Top" Foreground="#A33" TextWrapping="Wrap" Margin="0,8,0,4"/>
+                            <TextBlock x:Name="OmScanWarning" DockPanel.Dock="Top" Foreground="#A33" FontWeight="Bold" FontSize="16" TextWrapping="Wrap" Margin="0,0,0,8"/>
                             <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                                 <TextBlock Text="Сканер" VerticalAlignment="Center"/>
                                 <Button DockPanel.Dock="Right" Content="OK" Click="OnOmScan"/>
