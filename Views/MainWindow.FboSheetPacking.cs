@@ -623,11 +623,15 @@ public partial class MainWindow
 
     private void OnFboNewUnassignContextOpening(object sender, ContextMenuEventArgs e)
     {
-        var host = sender as FrameworkElement;
-        var data = host?.DataContext;
-        var menu = host?.ContextMenu;
+        if (sender is not FrameworkElement host)
+            return;
+        if (ContextMenuOwnedByDescendant(host, e.OriginalSource as DependencyObject))
+            return;
+        var data = OverviewDataFromSource(e.OriginalSource as DependencyObject) ?? host.DataContext;
+        var menu = host.ContextMenu;
         if (menu is null)
             return;
+        menu.Tag = data;
         var unassign = CanUnassignOverview(data);
         var unbindPallet = CanUnbindPalletOverview(data);
         if (!unassign && !unbindPallet)
@@ -646,6 +650,31 @@ public partial class MainWindow
             };
         }
     }
+
+    private static bool ContextMenuOwnedByDescendant(FrameworkElement host, DependencyObject? origin)
+    {
+        for (var current = origin; current != null && !ReferenceEquals(current, host); current = ParentOf(current))
+        {
+            if (current is FrameworkElement fe &&
+                fe.ContextMenu != null &&
+                !ReferenceEquals(fe, host))
+                return true;
+        }
+        return false;
+    }
+
+    private static object? OverviewDataFromSource(DependencyObject? origin)
+    {
+        for (var current = origin; current != null; current = ParentOf(current))
+        {
+            if (current is FrameworkElement fe && fe.DataContext is FboOverviewLineRow)
+                return fe.DataContext;
+        }
+        return null;
+    }
+
+    private static DependencyObject? ParentOf(DependencyObject current) =>
+        current is Visual ? VisualTreeHelper.GetParent(current) : LogicalTreeHelper.GetParent(current);
 
     private static bool CanUnassignOverview(object? data) =>
         (data is FboOverviewLineRow line && line.CanUnassign)
@@ -682,9 +711,14 @@ public partial class MainWindow
 
     private static object? OverviewMenuData(object sender)
     {
-        return ((sender as MenuItem)?.Parent as ContextMenu)?.PlacementTarget is FrameworkElement target
-            ? target.DataContext
-            : (sender as FrameworkElement)?.DataContext;
+        if (sender is MenuItem item && item.Parent is ContextMenu menu)
+        {
+            if (menu.Tag is FboOverviewLineRow or FboOverviewGroupRow)
+                return menu.Tag;
+            if (menu.PlacementTarget is FrameworkElement target)
+                return target.DataContext;
+        }
+        return (sender as FrameworkElement)?.DataContext;
     }
 
     private async void OnFboNewUnassignClick(object sender, RoutedEventArgs e)

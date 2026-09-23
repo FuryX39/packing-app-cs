@@ -123,9 +123,11 @@
                     <ItemsControl ItemsSource="{Binding Lines}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding Text}" Style="{StaticResource FboNewOverviewLine}"
-                                           ContextMenu="{StaticResource FboNewUnassignMenu}"
-                                           ContextMenuOpening="OnFboNewUnassignContextOpening"/>
+                                <Border Background="Transparent" Padding="0,2"
+                                        ContextMenu="{StaticResource FboNewUnassignMenu}"
+                                        ContextMenuOpening="OnFboNewUnassignContextOpening">
+                                    <TextBlock Text="{Binding Text}" Style="{StaticResource FboNewOverviewLine}"/>
+                                </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
@@ -640,6 +642,126 @@
                             </GroupBox>
                             <TextBox x:Name="TaskDescription" IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True"
                                      VerticalScrollBarVisibility="Auto" Margin="0,0,0,8"/>
+                        </DockPanel>
+                    </Grid>
+                </DockPanel>
+            </TabItem>
+            <TabItem Header="Прочие маркетплейсы">
+                <DockPanel Margin="6">
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <Button DockPanel.Dock="Left" Content="Обновить" Click="OnReloadOtherMp"/>
+                        <TextBlock VerticalAlignment="Center" Margin="12,0,0,0" Text="ВсеИнструменты"/>
+                    </DockPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="280" MinWidth="200"/>
+                            <ColumnDefinition Width="6"/>
+                            <ColumnDefinition Width="*" MinWidth="480"/>
+                        </Grid.ColumnDefinitions>
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="Мои задания" Margin="0,0,0,4"/>
+                            <DataGrid x:Name="OmJobsGrid" Style="{StaticResource RowLinesGrid}" SelectionChanged="OnOmJobSelected">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="№" Binding="{Binding Id}" Width="52" ElementStyle="{StaticResource CellText}"/>
+                                    <DataGridTextColumn Header="Заказ" Binding="{Binding Status}" Width="*" ElementStyle="{StaticResource CellText}"/>
+                                    <DataGridTextColumn Header="Готово" Binding="{Binding Progress}" Width="72" ElementStyle="{StaticResource CellText}"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </DockPanel>
+                        <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Stretch"/>
+                        <DockPanel Grid.Column="2">
+                            <DockPanel DockPanel.Dock="Top">
+                                <TextBlock x:Name="OmJobTitle" Text="Выберите задание" FontWeight="SemiBold" FontSize="14"/>
+                                <Button DockPanel.Dock="Right" Content="Печать А4" Click="OnOmPrintA4"/>
+                                <TextBlock x:Name="OmJobStats" HorizontalAlignment="Right" Margin="0,0,12,0"/>
+                            </DockPanel>
+                            <GroupBox Header="Последний пик" DockPanel.Dock="Top" Margin="0,8,0,0" Padding="8">
+                                <DockPanel>
+                                    <Border DockPanel.Dock="Left" Width="72" Height="72" Background="#F3F3F3" BorderBrush="#CCC" BorderThickness="1" Margin="0,0,10,0">
+                                        <Image x:Name="OmActiveImage" Stretch="Uniform"/>
+                                    </Border>
+                                    <TextBlock x:Name="OmActiveText" Text="Нет активного товара — пикните товар. Ярлык заказа сам не печатается." TextWrapping="Wrap"/>
+                                </DockPanel>
+                            </GroupBox>
+                            <TextBlock x:Name="OmCisHint" DockPanel.Dock="Top" Foreground="#A33" TextWrapping="Wrap" Margin="0,8,0,4"/>
+                            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                                <TextBlock Text="Сканер" VerticalAlignment="Center"/>
+                                <Button DockPanel.Dock="Right" Content="OK" Click="OnOmScan"/>
+                                <TextBox x:Name="OmScanBox" Margin="8,0" KeyDown="OnOmScanKey"/>
+                            </DockPanel>
+                            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                                <CheckBox x:Name="OmManualBox" Content="Ручная сборка (остаток + ШК с экрана)" Click="OnOmManualToggle"/>
+                                <CheckBox x:Name="OmPrintBarcodes" Content="Печать шк" Margin="16,0,0,0"/>
+                            </StackPanel>
+                            <GroupBox x:Name="OmManualPanel" Header="Остаток к сборке" DockPanel.Dock="Top" Height="220" Margin="0,0,0,8" Visibility="Collapsed">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="200"/>
+                                    </Grid.ColumnDefinitions>
+                                    <DataGrid x:Name="OmRemainingGrid" Style="{StaticResource RowLinesGrid}"
+                                              SelectionChanged="OnOmRemainingSelected"
+                                              MouseDoubleClick="OnOmRemainingPick">
+                                        <DataGrid.Columns>
+                                            <DataGridTemplateColumn Header="Фото" Width="48" CanUserResize="False">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <Image Source="{Binding Photo}" Width="30" Height="30" Stretch="Uniform"/>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                            <DataGridTextColumn Header="Артикул" Binding="{Binding Sku}" Width="100" ElementStyle="{StaticResource CellText}"/>
+                                            <DataGridTextColumn Header="Название" Binding="{Binding Name}" Width="*" ElementStyle="{StaticResource CellText}"/>
+                                            <DataGridTextColumn Header="Ост." Binding="{Binding Qty}" Width="52" ElementStyle="{StaticResource CellText}"/>
+                                            <DataGridTextColumn Header="ШК поставки" Binding="{Binding Barcode}" Width="140" ElementStyle="{StaticResource CellText}"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                    <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                        <TextBlock Text="ШК поставки"/>
+                                        <Border Width="180" Height="80" Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="0,6">
+                                            <Image x:Name="OmBarcodeImage" Stretch="Uniform"/>
+                                        </Border>
+                                        <Button Content="Взять (тап)" Click="OnOmRemainingPick"/>
+                                    </StackPanel>
+                                </Grid>
+                            </GroupBox>
+                            <GroupBox Header="Строки задания" Padding="6">
+                                <DockPanel>
+                                    <DockPanel DockPanel.Dock="Bottom" Margin="0,4,0,0">
+                                        <TextBlock Text="Поиск в задании" VerticalAlignment="Center"/>
+                                        <Button DockPanel.Dock="Right" Content="Найти" Click="OnOmLinesSearch"/>
+                                        <TextBox x:Name="OmLinesSearch" Margin="8,0" KeyUp="OnOmLinesSearchKey"/>
+                                    </DockPanel>
+                                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,4,0,0">
+                                        <Button Content="Назад" Click="OnOmLinesPrev" x:Name="OmLinesPrev"/>
+                                        <TextBlock x:Name="OmLinesPageLabel" VerticalAlignment="Center" Margin="8,0"/>
+                                        <Button Content="Вперёд" Click="OnOmLinesNext" x:Name="OmLinesNext"/>
+                                    </StackPanel>
+                                    <DataGrid x:Name="OmLinesGrid" Style="{StaticResource RowLinesGrid}"
+                                              PreviewMouseRightButtonDown="OnGridRightButtonDown"
+                                              ContextMenuOpening="OnOmLinesContextOpening">
+                                        <DataGrid.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Статус: готово" Click="OnOmLineStatusToggle"/>
+                                            </ContextMenu>
+                                        </DataGrid.ContextMenu>
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="№" Binding="{Binding Seq}" Width="44" ElementStyle="{StaticResource CellText}"/>
+                                            <DataGridTemplateColumn Header="Фото" Width="48" CanUserResize="False">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <Image Source="{Binding Photo}" Width="30" Height="30" Stretch="Uniform"/>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                            <DataGridTextColumn Header="Артикул" Binding="{Binding Sku}" Width="100" ElementStyle="{StaticResource CellText}"/>
+                                            <DataGridTextColumn Header="Название" Binding="{Binding Name}" Width="*" ElementStyle="{StaticResource CellText}"/>
+                                            <DataGridTextColumn Header="Кол-во" Binding="{Binding Order}" Width="70" ElementStyle="{StaticResource CellText}"/>
+                                            <DataGridTextColumn Header="Статус" Binding="{Binding Status}" Width="100" ElementStyle="{StaticResource CellText}"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </DockPanel>
+                            </GroupBox>
                         </DockPanel>
                     </Grid>
                 </DockPanel>

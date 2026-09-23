@@ -25,7 +25,42 @@ public partial class SettingsWindow : Window
         PrinterLabelBox.Text = config.LabelPrinter;
         SettingsLabelBox.Text = config.LabelSettings;
         RefreshBox.Text = config.RefreshSeconds;
+        PeerAcceptBox.IsChecked = config.PeerPrintAccept;
         RefreshCacheSummary();
+        Loaded += async (_, _) => await ReloadPrintersAsync();
+    }
+
+    private async void OnRefreshPeers(object sender, RoutedEventArgs e)
+    {
+        await ReloadPrintersAsync();
+    }
+
+    private async Task ReloadPrintersAsync()
+    {
+        RefreshPeersButton.IsEnabled = false;
+        PeerStatus.Text = "Поиск компьютеров...";
+        try
+        {
+            PeerPrint.Announce();
+            await Task.Delay(800);
+            var remote = await Task.Run(PeerPrint.RemoteChoices);
+            var items = new List<string> { "" };
+            items.AddRange(GdiPrinter.InstalledPrinters());
+            items.AddRange(remote);
+            var a4 = PrinterA4Box.Text;
+            var label = PrinterLabelBox.Text;
+            PrinterA4Box.ItemsSource = items;
+            PrinterLabelBox.ItemsSource = items.ToList();
+            PrinterA4Box.Text = a4;
+            PrinterLabelBox.Text = label;
+            PeerStatus.Text = remote.Count == 0
+                ? "Других компьютеров с запущенным приложением не видно."
+                : $"Принтеров с других компьютеров: {remote.Count}.";
+        }
+        finally
+        {
+            RefreshPeersButton.IsEnabled = true;
+        }
     }
 
     private void RefreshCacheSummary()
@@ -87,6 +122,7 @@ public partial class SettingsWindow : Window
         _config.Printer = _config.PrinterLabel;
         _config.PrintSettings = _config.PrintSettingsLabel;
         _config.RefreshSeconds = seconds.ToString();
+        _config.PeerPrintAccept = PeerAcceptBox.IsChecked == true;
         try
         {
             _config.Save();

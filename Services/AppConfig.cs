@@ -16,6 +16,7 @@ public sealed class AppConfig
     public string PrintSettingsLabel { get; set; } = "noscale,portrait,disable-auto-rotation,paper=47mm x 25mm";
     public string RefreshSeconds { get; set; } = "30";
     public string FbsSkipMpConfirm { get; set; } = "0";
+    public string PeerPrintAcceptRaw { get; set; } = "1";
 
     public string LabelPrinter => string.IsNullOrWhiteSpace(PrinterLabel) ? Printer : PrinterLabel;
     public string LabelSettings => string.IsNullOrWhiteSpace(PrintSettingsLabel) ? PrintSettings : PrintSettingsLabel;
@@ -38,6 +39,18 @@ public sealed class AppConfig
             return raw is "1" or "true" or "yes" or "on";
         }
         set => FbsSkipMpConfirm = value ? "1" : "0";
+    }
+
+    public bool PeerPrintAccept
+    {
+        get
+        {
+            var raw = (PeerPrintAcceptRaw ?? "").Trim().ToLowerInvariant();
+            if (raw.Length == 0)
+                return true;
+            return raw is "1" or "true" or "yes" or "on";
+        }
+        set => PeerPrintAcceptRaw = value ? "1" : "0";
     }
 
     public static string ConfigPath
@@ -87,6 +100,7 @@ public sealed class AppConfig
                 case "BARCODE_PRINT_SETTINGS_LABEL": cfg.PrintSettingsLabel = value; break;
                 case "REFRESH_SECONDS": cfg.RefreshSeconds = value; break;
                 case "FBS_SKIP_MP_CONFIRM": cfg.FbsSkipMpConfirm = value; break;
+                case "PEER_PRINT_ACCEPT": cfg.PeerPrintAcceptRaw = value; break;
             }
         }
         if (string.IsNullOrWhiteSpace(cfg.PrinterLabel))
@@ -115,6 +129,7 @@ public sealed class AppConfig
             $"BARCODE_PRINT_SETTINGS_LABEL={Quote(LabelSettings)}",
             $"REFRESH_SECONDS={Quote(RefreshSeconds)}",
             $"FBS_SKIP_MP_CONFIRM={Quote(FbsSkipMpConfirm)}",
+            $"PEER_PRINT_ACCEPT={Quote(PeerPrintAcceptRaw)}",
             "",
         };
         File.WriteAllText(path, string.Join('\n', lines), new UTF8Encoding(false));

@@ -1,5 +1,7 @@
+using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 
@@ -181,6 +183,37 @@ public sealed class ApiClient : IDisposable
 
     public Task<byte[]> FbsDownloadLineLabelsZipAsync(int jobId, CancellationToken ct = default) =>
         ApiBytesAsync($"/api/v1/fbs-packing/jobs/{jobId}/line-labels.zip", 180, ct);
+
+    public async Task<List<JsonMap>> OtherMpMyJobsAsync(CancellationToken ct = default)
+    {
+        var body = await ApiJsonAsync("GET", "/api/v1/other-marketplaces/my", null, 30, ct);
+        return body.Arr("jobs");
+    }
+
+    public async Task<JsonMap> OtherMpOpenJobAsync(int jobId, CancellationToken ct = default)
+    {
+        var body = await ApiJsonAsync("GET", $"/api/v1/other-marketplaces/jobs/{jobId}/pack", null, 30, ct);
+        return body.Obj("job") ?? body;
+    }
+
+    public Task<JsonMap> OtherMpScanAsync(int jobId, string barcode, CancellationToken ct = default) =>
+        ApiJsonAsync("POST", $"/api/v1/other-marketplaces/jobs/{jobId}/scan", new { barcode }, 60, ct);
+
+    public Task<JsonMap> OtherMpPickAsync(int jobId, string sku, int? productId, CancellationToken ct = default)
+    {
+        object body = productId is int pid ? new { sku, product_id = pid } : new { sku };
+        return ApiJsonAsync("POST", $"/api/v1/other-marketplaces/jobs/{jobId}/pick", body, 60, ct);
+    }
+
+    public Task<JsonMap> OtherMpSetLineStatusAsync(int jobId, int lineId, string status, CancellationToken ct = default) =>
+        ApiJsonAsync("POST", $"/api/v1/other-marketplaces/jobs/{jobId}/lines/{lineId}/set-status", new { status }, 30, ct);
+
+    public Task<byte[]> OtherMpRouteSheetAsync(int jobId, string cargoType, int cargoCount, CancellationToken ct = default) =>
+        ApiPostBytesAsync(
+            $"/api/v1/other-marketplaces/jobs/{jobId}/route-sheet.pdf",
+            new { cargo_type = cargoType, cargo_count = cargoCount },
+            60,
+            ct);
 
     public async Task<List<JsonMap>> FboMyJobsAsync(CancellationToken ct = default)
     {
@@ -374,6 +407,17 @@ public sealed class ApiClient : IDisposable
         return data;
     }
 
+    private async Task<byte[]> ApiPostBytesAsync(string path, object body, int timeoutSec, CancellationToken ct)
+    {
+        if (!ApiOk)
+            throw new ApiException(ApiError.Length > 0 ? ApiError : "Нет сессии API — войдите снова");
+        using var resp = await SendAsync(_apiHttp, "POST", Api(path), body, timeoutSec, ct);
+        var data = await resp.Content.ReadAsByteArrayAsync(ct);
+        if (!resp.IsSuccessStatusCode)
+            Raise(resp, Encoding.UTF8.GetString(data));
+        return data;
+    }
+
     private async Task<byte[]> ApiBytesAsync(string path, int timeoutSec, CancellationToken ct)
     {
         if (!ApiOk)
@@ -391,19 +435,55 @@ public sealed class ApiClient : IDisposable
     /// longer than any sane header timeout.
     private static async Task<HttpResponseMessage> SendAsync(HttpClient client, string method, string url, object? body, int timeoutSec, CancellationToken ct)
     {
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        cts.CancelAfter(TimeSpan.FromSeconds(timeoutSec));
-        var req = new HttpRequestMessage(new HttpMethod(method), url);
-        if (body != null)
-            req.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
-        try
+        Exception? last = null;
+        for (var attempt = 1; attempt <= 3; attempt++)
         {
-            return await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromSeconds(timeoutSec));
+            var req = new HttpRequestMessage(new HttpMethod(method), url);
+            if (body != null)
+                req.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+            try
+            {
+                return await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                req.Dispose();
+                throw new ApiException($"Сервер не ответил за {timeoutSec} с: {url}", 408);
+            }
+            catch (Exception ex) when (IsTransientNetwork(ex))
+            {
+                req.Dispose();
+                last = ex;
+                if (attempt >= 3)
+                    break;
+                await Task.Delay(TimeSpan.FromMilliseconds(150 * attempt), ct);
+            }
+            catch
+            {
+                req.Dispose();
+                throw;
+            }
         }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        throw new ApiException("Нет связи с сервером. Повторите пик.", last);
+    }
+
+    private static bool IsTransientNetwork(Exception ex)
+    {
+        for (var current = ex; current != null; current = current.InnerException)
         {
-            throw new ApiException($"Сервер не ответил за {timeoutSec} с: {url}", 408);
+            if (current is OperationCanceledException)
+                return false;
         }
+        for (var current = ex; current != null; current = current.InnerException)
+        {
+            if (current is HttpRequestException or SocketException or IOException)
+                return true;
+            if (current.GetType().Name is "HttpIOException" or "WinHttpException")
+                return true;
+        }
+        return false;
     }
 
     private static void Raise(HttpResponseMessage resp, string text)
@@ -451,12 +531,18 @@ public sealed class ApiClient : IDisposable
 
     private static HttpClient NewClient(CookieContainer cookies)
     {
-        var handler = new HttpClientHandler
+        var handler = new SocketsHttpHandler
         {
             CookieContainer = cookies,
             UseCookies = true,
             AllowAutoRedirect = true,
+            ConnectTimeout = TimeSpan.FromSeconds(8),
+            PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+            PooledConnectionIdleTimeout = TimeSpan.FromSeconds(4),
+            MaxConnectionsPerServer = 8,
         };
-        return new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
+        var client = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
+        client.DefaultRequestHeaders.ExpectContinue = false;
+        return client;
     }
 }

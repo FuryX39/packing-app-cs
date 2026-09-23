@@ -1,4 +1,5 @@
 using System.Windows;
+using WarehousePacking.Services;
 using WarehousePacking.Views;
 
 namespace WarehousePacking;
@@ -15,6 +16,7 @@ public partial class App : Application
             return;
         }
 
+        PeerPrint.Start();
         var login = new LoginWindow();
         if (login.ShowDialog() == true && login.Client is { } client)
         {
@@ -25,5 +27,11 @@ public partial class App : Application
             return;
         }
         Shutdown();
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        PeerPrint.Stop();
+        base.OnExit(e);
     }
 }

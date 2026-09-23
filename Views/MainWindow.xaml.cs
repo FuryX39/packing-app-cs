@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Net.Http;
+using System.Net.Sockets;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -130,6 +132,9 @@ public partial class MainWindow : Window
         FboNewByProductList.ItemsSource = _fboNewByProductRows;
         FboNewByCargoList.ItemsSource = _fboNewByCargoRows;
         FboNewByPalletList.ItemsSource = _fboNewByPalletRows;
+        OmJobsGrid.ItemsSource = _omJobRows;
+        OmLinesGrid.ItemsSource = _omLineRows;
+        OmRemainingGrid.ItemsSource = _omRemainingRows;
 
         _tasksTimer.Tick += (_, _) =>
         {
@@ -211,6 +216,10 @@ public partial class MainWindow : Window
                 _tasksTimer.Stop();
                 _ = LoadCatalogAsync(false);
                 break;
+            case 5:
+                _tasksTimer.Stop();
+                _ = LoadOtherMpJobsAsync();
+                break;
         }
     }
 
@@ -258,6 +267,12 @@ public partial class MainWindow : Window
         {
             MessageBox.Show(this, ex.Message, "Внимание", MessageBoxButton.OK, MessageBoxImage.Warning);
             SetStatus("Ошибка");
+            return;
+        }
+        if (ex is HttpRequestException or IOException or SocketException)
+        {
+            MessageBox.Show(this, "Нет связи с сервером. Повторите пик.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            SetStatus("Нет связи с сервером");
             return;
         }
         MessageBox.Show(this, ex.Message, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);

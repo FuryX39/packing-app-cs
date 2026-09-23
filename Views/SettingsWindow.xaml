@@ -1,7 +1,7 @@
 <Window x:Class="WarehousePacking.Views.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Настройки" Height="620" Width="760"
+        Title="Настройки" Height="760" Width="760"
         WindowStartupLocation="CenterOwner">
     <Grid Margin="12">
         <Grid.RowDefinitions>
@@ -41,6 +41,18 @@
                 </Grid>
                 <TextBlock TextWrapping="Wrap" Foreground="#555" Margin="0,12,0,8"
                            Text="Настройки сохраняются в config.env рядом с приложением. Веб — run_web.py. API — run_api.py. Печать тихая через Windows GDI, SumatraPDF не нужен. Размер этикетки: paper=ШИРИНАmm x ВЫСОТАmm."/>
+                <GroupBox Header="Печать через другой компьютер" Padding="8" Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock TextWrapping="Wrap" Foreground="#555" Margin="0,0,0,6"
+                                   Text="На обоих компьютерах должно быть запущено это приложение, оба в одной частной сети. При первом запуске разрешите WarehousePacking в брандмауэре Windows для частной сети. Чужой принтер в списках выше выглядит как [ИМЯ-ПК] Название."/>
+                        <CheckBox x:Name="PeerAcceptBox" Margin="0,0,0,6"
+                                  Content="Разрешить другим компьютерам печатать на принтеры этого ПК"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="RefreshPeersButton" Content="Обновить компьютеры" Click="OnRefreshPeers"/>
+                            <TextBlock x:Name="PeerStatus" Margin="12,4,0,0" VerticalAlignment="Center" Text="Поиск компьютеров..."/>
+                        </StackPanel>
+                    </StackPanel>
+                </GroupBox>
                 <GroupBox Header="Кэш ярлыков FBS" Padding="8" Margin="0,0,0,8">
                     <StackPanel>
                         <TextBlock x:Name="CacheSummary" Margin="0,0,0,4"/>

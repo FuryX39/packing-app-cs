@@ -29,6 +29,17 @@ public static class GdiPrinter
 
     public static void PrintPdfs(IEnumerable<byte[]> pdfs, PrintProfile profile, int copies = 1)
     {
+        if (PeerPrint.IsRemote(profile.Printer))
+        {
+            var remote = new List<byte[]>();
+            foreach (var pdf in pdfs)
+            {
+                if (pdf is { Length: > 0 })
+                    remote.Add(pdf);
+            }
+            PeerPrint.Print(remote, profile, copies);
+            return;
+        }
         var options = PrintOptions.Parse(profile.Settings);
         var dpi = options.Paper == "a4" ? 200 : 300;
         var pages = new List<(Bitmap Bitmap, (double W, double H) Pts)>();
