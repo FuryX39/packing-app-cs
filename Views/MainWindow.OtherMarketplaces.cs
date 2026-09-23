@@ -320,10 +320,6 @@ public partial class MainWindow
         RenderOmJob();
         var copies = result.Int("barcode_copies");
         var barcode = result.Str("barcode");
-        var warning = result.Str("warning");
-        var mismatch = result.Flag("mismatch");
-        if (mismatch && string.IsNullOrWhiteSpace(warning))
-            warning = $"Штрихкода «{barcode}» нет в файле поставки. Строка принята, код записан в лист несовпадений.";
         var lineId = result.Int("line_id");
         var line = (_omJob?.Arr("lines") ?? []).FirstOrDefault(item => item.Int("id") == lineId);
         var sku = line?.Str("sku") ?? "";
@@ -341,14 +337,9 @@ public partial class MainWindow
                 await Task.Run(() => GdiPrinter.PrintPdf(pdf, _config.LabelProfile(), copies));
             });
         }
-        if (mismatch)
-            ShowOmScanWarning(warning, "Штрихкод не из поставки", replaceActive: false);
-        else
-        {
-            OmScanWarning.Text = "";
-            SetStatus(copies > 0 ? $"ШК поставки {barcode}: {copies} шт." : "Строка отмечена");
-            OmScanBox.Focus();
-        }
+        OmScanWarning.Text = "";
+        SetStatus(copies > 0 ? $"ШК поставки {barcode}: {copies} шт." : "Строка отмечена");
+        OmScanBox.Focus();
     }
 
     private JsonMap? SelectedOmLine()
