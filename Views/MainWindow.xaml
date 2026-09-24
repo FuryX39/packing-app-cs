@@ -416,7 +416,7 @@
                     </DockPanel>
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="260" MinWidth="200"/>
+                            <ColumnDefinition Width="360" MinWidth="260"/>
                             <ColumnDefinition Width="6"/>
                             <ColumnDefinition Width="*" MinWidth="480"/>
                         </Grid.ColumnDefinitions>
@@ -430,9 +430,9 @@
                             <DataGrid x:Name="FbsJobsGrid" Style="{StaticResource RowLinesGrid}"
                                       SelectionChanged="OnFbsJobSelected">
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="№" Binding="{Binding Id}" Width="52" ElementStyle="{StaticResource CellText}"/>
-                                    <DataGridTextColumn Header="Статус" Binding="{Binding Status}" Width="*" ElementStyle="{StaticResource CellText}"/>
-                                    <DataGridTextColumn Header="Готово" Binding="{Binding Progress}" Width="72" ElementStyle="{StaticResource CellText}"/>
+                                    <DataGridTextColumn Header="Задание" Binding="{Binding Title}" Width="*" ElementStyle="{StaticResource CellText}"/>
+                                    <DataGridTextColumn Header="Статус" Binding="{Binding Status}" Width="88" ElementStyle="{StaticResource CellText}"/>
+                                    <DataGridTextColumn Header="Готово" Binding="{Binding Progress}" Width="64" ElementStyle="{StaticResource CellText}"/>
                                 </DataGrid.Columns>
                             </DataGrid>
                         </DockPanel>

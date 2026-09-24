@@ -936,6 +936,20 @@ public partial class MainWindow : Window
         catch (Exception ex) { ShowError(ex); }
     }
 
+    private static string FbsJobName(JsonMap job)
+    {
+        var market = job.Str("marketplace").ToLowerInvariant() switch
+        {
+            "wildberries" => "WB",
+            "ozon" => "Ozon",
+            "yandex" => "Яндекс",
+            var other when other.Length > 0 => other,
+            _ => "FBS",
+        };
+        var transfer = job.Str("transfer_number");
+        return transfer.Length > 0 ? $"{market} - {transfer}" : market;
+    }
+
     private void RenderFbsJobs()
     {
         var (visible, page) = Paging.Slice(_fbsJobs, _fbsJobsPage);
@@ -947,6 +961,7 @@ public partial class MainWindow : Window
             _fbsJobRows.Add(new FbsJobRow
             {
                 Id = j.Int("id"),
+                Title = FbsJobName(j),
                 Status = Paging.JobStatusRu(j.Str("status")),
                 Progress = $"{j.Int("line_done")}/{j.Int("line_total")}",
             });
@@ -1017,7 +1032,7 @@ public partial class MainWindow : Window
     private void RenderFbsJob()
     {
         var job = _fbsJob;
-        FbsJobTitle.Text = job is null ? "Выберите задание" : $"Задание #{job.Str("id")}";
+        FbsJobTitle.Text = job is null ? "Выберите задание" : FbsJobName(job);
         var done = job?.Int("line_done") ?? 0;
         var total = job?.Int("line_total") ?? 0;
         var pending = job?.Int("line_pending", job?.Int("remaining") ?? 0) ?? 0;

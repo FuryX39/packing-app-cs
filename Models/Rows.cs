@@ -51,6 +51,7 @@ public sealed class CatalogRow : PhotoRow
 public sealed class FbsJobRow
 {
     public int Id { get; init; }
+    public string Title { get; init; } = "";
     public string Status { get; init; } = "";
     public string Progress { get; init; } = "";
 }
