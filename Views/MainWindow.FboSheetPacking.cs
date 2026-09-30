@@ -177,6 +177,8 @@ public partial class MainWindow
 
     private void OnFboNewRemainingDoubleClick(object sender, MouseButtonEventArgs e)
     {
+        if (FindParent<DataGridRow>(e.OriginalSource as DependencyObject) is null)
+            return;
         if (FboNewRemainingGrid.SelectedItem is not RemainingRow row) return;
         if (_fboNewJob?.Obj("open_pallet") is null)
         {
@@ -355,9 +357,10 @@ public partial class MainWindow
             return;
         }
         var jobId = _fboNewJob.Int("id");
+        var allFree = FboNewPrintAllFree.IsChecked == true;
         await FboNewRunAsync(async () =>
         {
-            var payload = await _client.FboSheetPrintBoxesAsync(jobId, count);
+            var payload = await _client.FboSheetPrintBoxesAsync(jobId, count, allFree);
             _fboNewJob = payload.Obj("job") ?? _fboNewJob;
             var boxes = payload.Arr("boxes");
             if (boxes.Count > 0)

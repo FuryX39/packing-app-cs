@@ -1305,6 +1305,11 @@ public partial class MainWindow : Window
 
     private async void OnRemainingPick(object sender, RoutedEventArgs e)
     {
+        // Двойной клик по стрелкам/ползунку скроллбара тоже всплывает как MouseDoubleClick
+        // у DataGrid — без проверки строки товар ошибочно берётся в работу.
+        if (e is MouseButtonEventArgs mouse
+            && FindParent<DataGridRow>(mouse.OriginalSource as DependencyObject) is null)
+            return;
         if (_fbsJob is null || _selectedGroup is null) return;
         var jobId = _fbsJob.Int("id");
         var sku = _selectedGroup.Str("sku");

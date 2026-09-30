@@ -293,6 +293,9 @@ public partial class MainWindow
 
     private async void OnOmRemainingPick(object sender, RoutedEventArgs e)
     {
+        if (e is MouseButtonEventArgs mouse
+            && FindParent<DataGridRow>(mouse.OriginalSource as DependencyObject) is null)
+            return;
         if (_omJob is null || _omSelectedGroup is null) return;
         if (_omSelectedGroup.Flag("require_cis"))
         {

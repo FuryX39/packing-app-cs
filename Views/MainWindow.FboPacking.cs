@@ -285,7 +285,12 @@ public partial class MainWindow
     }
 
     private async void OnFboRemainingPick(object sender, RoutedEventArgs e) => await PickFboRemainingAsync();
-    private async void OnFboRemainingPick(object sender, MouseButtonEventArgs e) => await PickFboRemainingAsync();
+    private async void OnFboRemainingPick(object sender, MouseButtonEventArgs e)
+    {
+        if (FindParent<DataGridRow>(e.OriginalSource as DependencyObject) is null)
+            return;
+        await PickFboRemainingAsync();
+    }
 
     private async Task PickFboRemainingAsync()
     {

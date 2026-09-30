@@ -326,6 +326,10 @@
                                         <Button Content="Печать" Click="OnFboNewPrintBoxes"/>
                                         <Button Content="Перепечатать последний" Click="OnFboNewReprintLast" Margin="8,0,0,0"/>
                                     </StackPanel>
+                                    <CheckBox x:Name="FboNewPrintAllFree"
+                                              Content="Печатать все свободные грузоместа"
+                                              Margin="88,6,0,0"
+                                              ToolTip="Выкл: только ещё не печатавшиеся. Вкл: все без присвоенного товара, в том числе уже печатавшиеся ШК."/>
                                     <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                         <TextBlock Text="Паллеты" VerticalAlignment="Center" Width="80"/>
                                         <TextBox x:Name="FboNewPalletPrintCount" Width="48" Margin="8,0" Text="5"/>

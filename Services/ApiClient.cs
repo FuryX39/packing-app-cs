@@ -277,8 +277,14 @@ public sealed class ApiClient : IDisposable
         return body.Obj("job") ?? body;
     }
 
-    public Task<JsonMap> FboSheetPrintBoxesAsync(int jobId, int count, CancellationToken ct = default) =>
-        ApiJsonAsync("POST", $"/api/v1/fbo-sheet-packing/jobs/{jobId}/print-boxes", new { count }, 60, ct);
+    public Task<JsonMap> FboSheetPrintBoxesAsync(
+        int jobId, int count, bool allFree = false, CancellationToken ct = default) =>
+        ApiJsonAsync(
+            "POST",
+            $"/api/v1/fbo-sheet-packing/jobs/{jobId}/print-boxes",
+            new { count, all_free = allFree },
+            60,
+            ct);
 
     public Task<JsonMap> FboSheetReprintBoxAsync(int jobId, int boxId, CancellationToken ct = default) =>
         ApiJsonAsync("POST", $"/api/v1/fbo-sheet-packing/jobs/{jobId}/reprint-box", new { box_id = boxId }, 60, ct);
