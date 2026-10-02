@@ -2,8 +2,10 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Drawing.Printing;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using PDFtoImage;
 using SkiaSharp;
 
@@ -12,6 +14,7 @@ namespace WarehousePacking.Services;
 public static class GdiPrinter
 {
     private static readonly object Gate = new();
+    private const int PrintTimeoutSeconds = 90;
 
     public static IReadOnlyList<string> InstalledPrinters()
     {
@@ -25,6 +28,103 @@ public static class GdiPrinter
     public static void PrintPdf(byte[] pdfBytes, PrintProfile profile, int copies = 1)
     {
         PrintPdfs([pdfBytes], profile, copies);
+    }
+
+    public static void PrintPdfsIsolated(
+        IEnumerable<byte[]> pdfs,
+        PrintProfile profile,
+        int copies = 1)
+    {
+        var documents = pdfs.Where(item => item is { Length: > 0 }).ToList();
+        if (documents.Count == 0)
+            throw new InvalidOperationException("Пустой PDF");
+        if (PeerPrint.IsRemote(profile.Printer))
+        {
+            PrintPdfs(documents, profile, copies);
+            return;
+        }
+
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            "WarehousePacking",
+            "print_jobs",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var paths = new List<string>();
+            for (var index = 0; index < documents.Count; index++)
+            {
+                var path = Path.Combine(directory, $"{index + 1}.pdf");
+                File.WriteAllBytes(path, documents[index]);
+                paths.Add(path);
+            }
+            var requestPath = Path.Combine(directory, "request.json");
+            var errorPath = Path.Combine(directory, "error.txt");
+            var request = new PrintWorkerRequest
+            {
+                Printer = profile.Printer,
+                Settings = profile.Settings,
+                Copies = Math.Clamp(copies, 1, 9999),
+                PdfPaths = paths,
+            };
+            File.WriteAllText(requestPath, JsonSerializer.Serialize(request));
+
+            var executable = Environment.ProcessPath;
+            if (string.IsNullOrWhiteSpace(executable))
+                throw new InvalidOperationException("Не найден исполняемый файл программы");
+            var start = new ProcessStartInfo
+            {
+                FileName = executable,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WorkingDirectory = AppContext.BaseDirectory,
+            };
+            start.ArgumentList.Add("--print-worker");
+            start.ArgumentList.Add(requestPath);
+            using var process = Process.Start(start)
+                ?? throw new InvalidOperationException("Не удалось запустить процесс печати");
+            if (!process.WaitForExit(TimeSpan.FromSeconds(PrintTimeoutSeconds)))
+            {
+                try { process.Kill(entireProcessTree: true); } catch { }
+                throw new TimeoutException(
+                    $"Принтер не ответил за {PrintTimeoutSeconds} секунд. " +
+                    "Проверьте очередь печати и повторите ярлык.");
+            }
+            if (process.ExitCode != 0)
+            {
+                var message = File.Exists(errorPath)
+                    ? File.ReadAllText(errorPath).Trim()
+                    : "Процесс печати завершился с ошибкой";
+                throw new InvalidOperationException(message);
+            }
+        }
+        finally
+        {
+            try { Directory.Delete(directory, recursive: true); } catch { }
+        }
+    }
+
+    public static int RunPrintWorker(string requestPath)
+    {
+        var directory = Path.GetDirectoryName(requestPath) ?? "";
+        try
+        {
+            var request = JsonSerializer.Deserialize<PrintWorkerRequest>(
+                File.ReadAllText(requestPath))
+                ?? throw new InvalidOperationException("Некорректное задание печати");
+            var pdfs = request.PdfPaths.Select(File.ReadAllBytes).ToList();
+            PrintPdfs(
+                pdfs,
+                new PrintProfile(request.Printer, request.Settings),
+                request.Copies);
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            try { File.WriteAllText(Path.Combine(directory, "error.txt"), ex.Message); } catch { }
+            return 1;
+        }
     }
 
     public static void PrintPdfs(IEnumerable<byte[]> pdfs, PrintProfile profile, int copies = 1)
@@ -222,5 +322,13 @@ public static class GdiPrinter
         var x = Math.Max(0, (area.Width - drawW) / 2);
         var y = Math.Max(0, (area.Height - drawH) / 2);
         return new Rectangle(x, y, drawW, drawH);
+    }
+
+    private sealed class PrintWorkerRequest
+    {
+        public string Printer { get; set; } = "";
+        public string Settings { get; set; } = "";
+        public int Copies { get; set; } = 1;
+        public List<string> PdfPaths { get; set; } = [];
     }
 }

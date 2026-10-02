@@ -1,8 +1,10 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using WarehousePacking.Models;
 using WarehousePacking.Services;
 
@@ -10,6 +12,10 @@ namespace WarehousePacking.Views;
 
 public partial class MainWindow
 {
+    private DatePickerTextBox? _fboNewProductionDateTextBox;
+    private bool _fboNewFormattingProductionDate;
+    private bool _fboNewChangingProductionDate;
+
     private bool RequireFboNewApi()
     {
         if (_client.ApiOk)
@@ -149,6 +155,10 @@ public partial class MainWindow
         var pallets = job is null ? "" : $" · паллеты {job.Int("pallet_closed")}/{job.Int("pallet_total")}";
         var pcs = job is null ? "" : $" · шт. {job.Int("pcs_assigned")}/{job.Int("pcs_plan")}";
         FboNewJobStats.Text = $"грузоместа {assigned}/{total} · напечатано {printed} · не печатались {pending}{pallets}{pcs}";
+        var occupiedPallets = job?.Int("occupied_pallet_count") ?? 0;
+        FboNewOccupiedPalletHint.Text = occupiedPallets > 0
+            ? $"пусто = {occupiedPallets} занятых"
+            : "занятых паллет нет";
         RefreshFboNewSelectedText();
         RenderFboNewRemaining();
         RenderFboNewOverview();
@@ -289,17 +299,23 @@ public partial class MainWindow
         }
         ApplyFboNewProductionDate(product);
         RefreshFboNewSelectedText();
-        if (string.IsNullOrWhiteSpace(FboNewQtyBox.Text))
-            FboNewQtyBox.Focus();
-        else
-            FocusFboNewScan();
+        FocusFboNewProductFields();
     }
 
     private void ClearFboNewProduct()
     {
         _fboNewProduct = null;
         FboNewQtyBox.Text = "";
-        FboNewProductionDate.SelectedDate = null;
+        _fboNewChangingProductionDate = true;
+        try
+        {
+            FboNewProductionDate.SelectedDate = null;
+            FboNewProductionDate.Text = "";
+        }
+        finally
+        {
+            _fboNewChangingProductionDate = false;
+        }
         FboNewQtyPanel.Visibility = Visibility.Collapsed;
         RefreshFboNewSelectedText();
     }
@@ -313,7 +329,103 @@ public partial class MainWindow
 
     private void ApplyFboNewProductionDate(JsonMap? product)
     {
-        FboNewProductionDate.SelectedDate = RememberedProductionDate(product);
+        _fboNewChangingProductionDate = true;
+        try
+        {
+            FboNewProductionDate.SelectedDate = RememberedProductionDate(product);
+        }
+        finally
+        {
+            _fboNewChangingProductionDate = false;
+        }
+    }
+
+    private void FocusFboNewProductFields()
+    {
+        if (_fboNewProduct?.Flag("has_shelf_life") == true &&
+            FboNewProductionDate.SelectedDate is null)
+        {
+            FboNewProductionDate.Focus();
+            _fboNewProductionDateTextBox?.Focus();
+            return;
+        }
+        FocusFboNewQuantity();
+    }
+
+    private void FocusFboNewQuantity()
+    {
+        FboNewQtyBox.Focus();
+        FboNewQtyBox.SelectAll();
+    }
+
+    private void OnFboNewProductionDateLoaded(object sender, RoutedEventArgs e)
+    {
+        var textBox = FboNewProductionDate.Template.FindName(
+            "PART_TextBox",
+            FboNewProductionDate) as DatePickerTextBox;
+        if (ReferenceEquals(textBox, _fboNewProductionDateTextBox))
+            return;
+        if (_fboNewProductionDateTextBox is not null)
+            _fboNewProductionDateTextBox.TextChanged -= OnFboNewProductionDateTextChanged;
+        _fboNewProductionDateTextBox = textBox;
+        if (textBox is not null)
+            textBox.TextChanged += OnFboNewProductionDateTextChanged;
+    }
+
+    private void OnFboNewProductionDateTextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_fboNewFormattingProductionDate || sender is not DatePickerTextBox textBox)
+            return;
+        var digits = new string((textBox.Text ?? "").Where(char.IsDigit).Take(8).ToArray());
+        var formatted = FormatFboNewProductionDate(digits);
+        if (!string.Equals(textBox.Text, formatted, StringComparison.Ordinal))
+        {
+            _fboNewFormattingProductionDate = true;
+            textBox.Text = formatted;
+            textBox.CaretIndex = formatted.Length;
+            _fboNewFormattingProductionDate = false;
+        }
+        if (digits.Length != 8 ||
+            !DateTime.TryParseExact(digits, "ddMMyyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+            return;
+        if (FboNewProductionDate.SelectedDate != date)
+            FboNewProductionDate.SelectedDate = date;
+    }
+
+    private static string FormatFboNewProductionDate(string digits)
+    {
+        if (digits.Length <= 1)
+            return digits;
+        if (digits.Length == 2)
+            return digits + ".";
+        if (digits.Length == 3)
+            return digits[..2] + "." + digits[2..];
+        if (digits.Length == 4)
+            return digits[..2] + "." + digits[2..] + ".";
+        return digits[..2] + "." + digits.Substring(2, 2) + "." + digits[4..];
+    }
+
+    private void OnFboNewProductionDateChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_fboNewChangingProductionDate || FboNewProductionDate.SelectedDate is null)
+            return;
+        Dispatcher.BeginInvoke(FocusFboNewQuantity, DispatcherPriority.Input);
+    }
+
+    private void OnFboNewProductionDateKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter || FboNewProductionDate.SelectedDate is null)
+            return;
+        e.Handled = true;
+        FocusFboNewQuantity();
+    }
+
+    private void OnFboNewQtyKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+            return;
+        e.Handled = true;
+        FocusFboNewScan();
     }
 
     private DateTime? RememberedProductionDate(JsonMap? product)
@@ -447,6 +559,75 @@ public partial class MainWindow
             SetStatus("Ярлык паллета перепечатан");
             FocusFboNewScan();
         }, "Перепечатка паллета...");
+    }
+
+    private async void OnFboNewPrintSupplyQr(object sender, RoutedEventArgs e)
+    {
+        if (_fboNewJob is null)
+        {
+            MessageBox.Show(this, "Сначала откройте задание", "FBO WB new");
+            return;
+        }
+        if (!int.TryParse((FboNewSupplyQrCopies.Text ?? "").Trim(), out var copies) ||
+            copies < 1 || copies > 9999)
+        {
+            MessageBox.Show(this, "Укажите количество копий QR от 1 до 9999", "FBO WB new");
+            return;
+        }
+        var jobId = _fboNewJob.Int("id");
+        await FboNewRunAsync(async () =>
+        {
+            var pdf = await _client.FboSheetDownloadSupplyQrAsync(jobId);
+            await Task.Run(() => GdiPrinter.PrintPdf(pdf, _config.LabelProfile(), copies));
+            SetStatus($"QR поставки отправлен на печать: {copies} шт.");
+            FocusFboNewScan();
+        }, "Печать QR поставки...");
+    }
+
+    private async void OnFboNewPrintPalletSheets(object sender, RoutedEventArgs e)
+    {
+        if (_fboNewJob is null)
+        {
+            MessageBox.Show(this, "Сначала откройте задание", "FBO WB new");
+            return;
+        }
+        if (!TryOptionalFboNewCount(FboNewSheetPrintCount.Text, "Количество листов", out var printCount) ||
+            !TryOptionalFboNewCount(FboNewSheetPalletTotal.Text, "Общее количество паллет", out var palletTotal))
+            return;
+        if (printCount is int count && palletTotal is int total && count > total)
+        {
+            MessageBox.Show(
+                this,
+                "Количество листов не может быть больше общего количества паллет",
+                "FBO WB new");
+            return;
+        }
+        var jobId = _fboNewJob.Int("id");
+        await FboNewRunAsync(async () =>
+        {
+            var pdf = await _client.FboSheetPalletSheetsAsync(jobId, printCount, palletTotal);
+            await Task.Run(() => GdiPrinter.PrintPdf(pdf, _config.A4Profile()));
+            SetStatus("Упаковочные листы отправлены на печать");
+            FocusFboNewScan();
+        }, "Печать упаковочных листов...");
+    }
+
+    private bool TryOptionalFboNewCount(string? raw, string label, out int? value)
+    {
+        var text = (raw ?? "").Trim();
+        if (text.Length == 0)
+        {
+            value = null;
+            return true;
+        }
+        if (!int.TryParse(text, out var parsed) || parsed < 1 || parsed > 200)
+        {
+            MessageBox.Show(this, $"{label}: укажите число от 1 до 200", "FBO WB new");
+            value = null;
+            return false;
+        }
+        value = parsed;
+        return true;
     }
 
     private void OnFboNewClosePallet(object sender, RoutedEventArgs e)

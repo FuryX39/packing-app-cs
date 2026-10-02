@@ -9,6 +9,17 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        var printWorkerIndex = Array.FindIndex(
+            e.Args,
+            arg => string.Equals(arg, "--print-worker", StringComparison.OrdinalIgnoreCase));
+        if (printWorkerIndex >= 0)
+        {
+            var requestPath = printWorkerIndex + 1 < e.Args.Length
+                ? e.Args[printWorkerIndex + 1]
+                : "";
+            Shutdown(GdiPrinter.RunPrintWorker(requestPath));
+            return;
+        }
         if (e.Args.Any(a => string.Equals(a, "--smoke", StringComparison.OrdinalIgnoreCase)))
         {
             Smoke.Run();

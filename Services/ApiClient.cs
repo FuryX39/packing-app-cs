@@ -295,6 +295,20 @@ public sealed class ApiClient : IDisposable
     public Task<JsonMap> FboSheetReprintPalletAsync(int jobId, int palletId, CancellationToken ct = default) =>
         ApiJsonAsync("POST", $"/api/v1/fbo-sheet-packing/jobs/{jobId}/reprint-pallet", new { pallet_id = palletId }, 60, ct);
 
+    public Task<byte[]> FboSheetDownloadSupplyQrAsync(int jobId, CancellationToken ct = default) =>
+        ApiBytesAsync($"/api/v1/fbo-sheet-packing/jobs/{jobId}/supply-qr.pdf", 60, ct);
+
+    public Task<byte[]> FboSheetPalletSheetsAsync(
+        int jobId,
+        int? printCount,
+        int? palletTotal,
+        CancellationToken ct = default) =>
+        ApiPostBytesAsync(
+            $"/api/v1/fbo-sheet-packing/jobs/{jobId}/pallet-sheets.pdf",
+            new { print_count = printCount, pallet_total = palletTotal },
+            120,
+            ct);
+
     public Task<JsonMap> FboSheetClosePalletAsync(int jobId, string barcode, CancellationToken ct = default) =>
         ApiJsonAsync("POST", $"/api/v1/fbo-sheet-packing/jobs/{jobId}/close-pallet", new { barcode }, 30, ct);
 
@@ -387,7 +401,7 @@ public sealed class ApiClient : IDisposable
     private async Task<JsonMap> WebJsonAsync(string method, string path, object? body, int timeoutSec, CancellationToken ct)
     {
         using var resp = await SendAsync(_web, method, Web(path), body, timeoutSec, ct);
-        var text = await resp.Content.ReadAsStringAsync(ct);
+        var text = await ReadTextAsync(resp, timeoutSec, ct);
         Raise(resp, text);
         return JsonMap.Parse(text);
     }
@@ -399,7 +413,7 @@ public sealed class ApiClient : IDisposable
         if (!ApiOk)
             throw new ApiException(ApiError.Length > 0 ? ApiError : "Нет сессии API — войдите снова");
         using var resp = await SendAsync(_apiHttp, method, Api(path), body, timeoutSec, ct);
-        var text = await resp.Content.ReadAsStringAsync(ct);
+        var text = await ReadTextAsync(resp, timeoutSec, ct);
         Raise(resp, text);
         return JsonMap.Parse(text);
     }
@@ -407,7 +421,7 @@ public sealed class ApiClient : IDisposable
     private async Task<byte[]> WebBytesAsync(string path, int timeoutSec, CancellationToken ct)
     {
         using var resp = await SendAsync(_web, "GET", Web(path), null, timeoutSec, ct);
-        var data = await resp.Content.ReadAsByteArrayAsync(ct);
+        var data = await ReadBytesAsync(resp, timeoutSec, ct);
         if (!resp.IsSuccessStatusCode)
             Raise(resp, Encoding.UTF8.GetString(data));
         return data;
@@ -418,7 +432,7 @@ public sealed class ApiClient : IDisposable
         if (!ApiOk)
             throw new ApiException(ApiError.Length > 0 ? ApiError : "Нет сессии API — войдите снова");
         using var resp = await SendAsync(_apiHttp, "POST", Api(path), body, timeoutSec, ct);
-        var data = await resp.Content.ReadAsByteArrayAsync(ct);
+        var data = await ReadBytesAsync(resp, timeoutSec, ct);
         if (!resp.IsSuccessStatusCode)
             Raise(resp, Encoding.UTF8.GetString(data));
         return data;
@@ -429,16 +443,52 @@ public sealed class ApiClient : IDisposable
         if (!ApiOk)
             throw new ApiException(ApiError.Length > 0 ? ApiError : "Нет сессии API — войдите снова");
         using var resp = await SendAsync(_apiHttp, "GET", Api(path), null, timeoutSec, ct);
-        var data = await resp.Content.ReadAsByteArrayAsync(ct);
+        var data = await ReadBytesAsync(resp, timeoutSec, ct);
         if (!resp.IsSuccessStatusCode)
             Raise(resp, Encoding.UTF8.GetString(data));
         return data;
     }
 
-    /// The timeout guards the wait for response headers only, matching the
-    /// python client's read timeout. Downloading the body of a large job must
-    /// not race a deadline: a job with hundreds of lines legitimately takes
-    /// longer than any sane header timeout.
+    private static async Task<string> ReadTextAsync(
+        HttpResponseMessage response,
+        int timeoutSec,
+        CancellationToken ct)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromSeconds(timeoutSec));
+        try
+        {
+            return await response.Content.ReadAsStringAsync(cts.Token);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            throw new ApiException(
+                $"Сервер не передал ответ за {timeoutSec} с. Повторите операцию.",
+                408);
+        }
+    }
+
+    private static async Task<byte[]> ReadBytesAsync(
+        HttpResponseMessage response,
+        int timeoutSec,
+        CancellationToken ct)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromSeconds(timeoutSec));
+        try
+        {
+            return await response.Content.ReadAsByteArrayAsync(cts.Token);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            throw new ApiException(
+                $"Сервер не передал файл за {timeoutSec} с. Повторите операцию.",
+                408);
+        }
+    }
+
+    /// Таймаут заголовков применяется здесь; чтение тела отдельно ограничено
+    /// тем же интервалом в ReadTextAsync / ReadBytesAsync.
     private static async Task<HttpResponseMessage> SendAsync(HttpClient client, string method, string url, object? body, int timeoutSec, CancellationToken ct)
     {
         Exception? last = null;

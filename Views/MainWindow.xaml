@@ -336,6 +336,21 @@
                                         <Button Content="Печать" Click="OnFboNewPrintPallets"/>
                                         <Button Content="Перепечатать последний" Click="OnFboNewReprintLastPallet" Margin="8,0,0,0"/>
                                     </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                        <TextBlock Text="QR поставки" VerticalAlignment="Center" Width="80"/>
+                                        <TextBox x:Name="FboNewSupplyQrCopies" Width="48" Margin="8,0" Text="1"/>
+                                        <TextBlock Text="копий" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <Button Content="Печать" Click="OnFboNewPrintSupplyQr"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                        <TextBlock Text="Упак. листы" VerticalAlignment="Center" Width="80"/>
+                                        <TextBlock Text="печатать" VerticalAlignment="Center" Margin="8,0,4,0"/>
+                                        <TextBox x:Name="FboNewSheetPrintCount" Width="48"/>
+                                        <TextBlock Text="из общего" VerticalAlignment="Center" Margin="8,0,4,0"/>
+                                        <TextBox x:Name="FboNewSheetPalletTotal" Width="48"/>
+                                        <Button Content="Печать" Click="OnFboNewPrintPalletSheets" Margin="8,0,0,0"/>
+                                        <TextBlock x:Name="FboNewOccupiedPalletHint" VerticalAlignment="Center" Margin="10,0,0,0" Foreground="#667085"/>
+                                    </StackPanel>
                                 </StackPanel>
                             </GroupBox>
                             <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
@@ -348,10 +363,14 @@
                                        FontSize="20" FontWeight="Bold" Foreground="#C0392B"
                                        Margin="0,0,0,8" Visibility="Collapsed"/>
                             <StackPanel x:Name="FboNewQtyPanel" DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8" Visibility="Collapsed">
-                                <TextBlock Text="Кол-во" VerticalAlignment="Center"/>
-                                <TextBox x:Name="FboNewQtyBox" Width="72" Margin="8,0"/>
-                                <TextBlock Text="Дата производства" VerticalAlignment="Center" Margin="16,0,0,0"/>
-                                <DatePicker x:Name="FboNewProductionDate" Width="150" Margin="8,0"/>
+                                <TextBlock Text="Дата производства" VerticalAlignment="Center"/>
+                                <DatePicker x:Name="FboNewProductionDate" Width="150" Margin="8,0"
+                                            Loaded="OnFboNewProductionDateLoaded"
+                                            PreviewKeyDown="OnFboNewProductionDateKeyDown"
+                                            SelectedDateChanged="OnFboNewProductionDateChanged"/>
+                                <TextBlock Text="Кол-во" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                                <TextBox x:Name="FboNewQtyBox" Width="72" Margin="8,0"
+                                         KeyDown="OnFboNewQtyKeyDown"/>
                                 <CheckBox x:Name="FboNewRememberQty" Content="Количество для всех последующих грузомест с этим SKU" VerticalAlignment="Center" Margin="16,0,0,0"/>
                             </StackPanel>
                             <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">

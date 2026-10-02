@@ -1334,6 +1334,13 @@ public partial class MainWindow : Window
 
     private async Task OnFbsScanAsync()
     {
+        if (_fbsBusy)
+        {
+            ScanSounds.Error();
+            SetStatus("Предыдущая операция ещё выполняется · штрихкод сохранён, повторите Enter");
+            FbsScanBox.SelectAll();
+            return;
+        }
         var code = FbsScanBox.Text.Trim();
         FbsScanBox.Text = "";
         if (code.Length == 0) return;
@@ -1392,7 +1399,7 @@ public partial class MainWindow : Window
         {
             var pdfs = await ResolvePdfsAsync(jobId, _lastScanLineIds, null);
             if (pdfs.Count > 0)
-                await Task.Run(() => GdiPrinter.PrintPdfs(pdfs, _config.LabelProfile()));
+                await Task.Run(() => GdiPrinter.PrintPdfsIsolated(pdfs, _config.LabelProfile()));
             SetStatus($"Ярлык перепечатан ({pdfs.Count})");
             FocusScan();
         }, "Перепечатка...");
@@ -1412,7 +1419,7 @@ public partial class MainWindow : Window
         {
             var pdfs = await ResolvePdfsAsync(jobId, ids, null);
             if (pdfs.Count > 0)
-                await Task.Run(() => GdiPrinter.PrintPdfs(pdfs, _config.LabelProfile()));
+                await Task.Run(() => GdiPrinter.PrintPdfsIsolated(pdfs, _config.LabelProfile()));
             SetStatus($"На повторную печать: {pdfs.Count} ярл.");
             FocusScan();
         }, "Перепечатка...");
@@ -1511,7 +1518,7 @@ public partial class MainWindow : Window
             {
                 if (pdfs.Count > 0)
                 {
-                    await Task.Run(() => GdiPrinter.PrintPdfs(pdfs, profile));
+                    await Task.Run(() => GdiPrinter.PrintPdfsIsolated(pdfs, profile));
                     printed = pdfs.Count;
                 }
             }
