@@ -128,12 +128,19 @@ public static class GdiPrinter
         doc.PrintController = new StandardPrintController();
         doc.OriginAtMargins = false;
         doc.PrinterSettings.PrinterName = ResolvePrinter(printer);
-        doc.PrinterSettings.Copies = 1;
+        // Для одной этикетки передаём тираж драйверу одним заданием.
+        // Повторная отрисовка одной страницы заставляет некоторые термопринтеры
+        // печатать тираж небольшими порциями с паузами между ними.
+        var driverCopies = pages.Count == 1 && doc.PrinterSettings.MaximumCopies >= copies
+            ? copies
+            : 1;
+        doc.PrinterSettings.Copies = (short)driverCopies;
         doc.DefaultPageSettings.Margins = new Margins(0, 0, 0, 0);
         ApplyPaper(doc, options);
 
         var pageIndex = 0;
         var copyIndex = 0;
+        var renderedCopies = driverCopies > 1 ? 1 : copies;
         doc.PrintPage += (_, e) =>
         {
             var (image, pts) = pages[pageIndex];
@@ -154,7 +161,7 @@ public static class GdiPrinter
             }
             pageIndex = 0;
             copyIndex++;
-            e.HasMorePages = copyIndex < copies;
+            e.HasMorePages = copyIndex < renderedCopies;
         };
         doc.Print();
     }
