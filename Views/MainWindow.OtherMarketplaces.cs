@@ -325,6 +325,7 @@ public partial class MainWindow
         if (job is not null) _omJob = job;
         RenderOmJob();
         var copies = result.Int("barcode_copies");
+        var pickedQuantity = result.Int("picked_quantity", copies);
         var barcode = result.Str("barcode");
         var lineId = result.Int("line_id");
         var line = (_omJob?.Arr("lines") ?? []).FirstOrDefault(item => item.Int("id") == lineId);
@@ -344,7 +345,7 @@ public partial class MainWindow
             });
         }
         OmScanWarning.Text = "";
-        ScanSounds.Ok();
+        ScanSounds.OkWithQuantity(pickedQuantity);
         SetStatus(copies > 0 ? $"ШК поставки {barcode}: {copies} шт." : "Строка отмечена");
         OmScanBox.Focus();
     }

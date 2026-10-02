@@ -1,4 +1,5 @@
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows.Media;
 
 namespace WarehousePacking.Services;
@@ -11,6 +12,7 @@ internal static class ScanSounds
     private static MediaPlayer? _ok;
     private static MediaPlayer? _error;
     private static bool _initFailed;
+    private static readonly SemaphoreSlim SpeechGate = new(1, 1);
 
     public static void Init()
     {
@@ -34,6 +36,25 @@ internal static class ScanSounds
 
     public static void Error() => Play(_error);
 
+    public static void OkWithQuantity(int quantity)
+    {
+        Ok();
+        if (quantity <= 0) return;
+        _ = Task.Run(async () =>
+        {
+            await SpeechGate.WaitAsync();
+            try
+            {
+                await Task.Delay(160);
+                SpeakQuantity(quantity);
+            }
+            finally
+            {
+                SpeechGate.Release();
+            }
+        });
+    }
+
     private static void Play(MediaPlayer? player)
     {
         Init();
@@ -48,6 +69,55 @@ internal static class ScanSounds
         {
             // Нет аудиоустройства — пропускаем.
         }
+    }
+
+    private static void SpeakQuantity(int quantity)
+    {
+        object? voice = null;
+        object? voices = null;
+        object? token = null;
+        try
+        {
+            var voiceType = Type.GetTypeFromProgID("SAPI.SpVoice");
+            if (voiceType is null) return;
+            voice = Activator.CreateInstance(voiceType);
+            if (voice is null) return;
+            dynamic speaker = voice;
+            try
+            {
+                voices = speaker.GetVoices("Language=419", "");
+                dynamic installed = voices;
+                if ((int)installed.Count > 0)
+                {
+                    token = installed.Item(0);
+                    speaker.Voice = token;
+                }
+            }
+            catch
+            {
+                // Русский голос не установлен — используется системный голос по умолчанию.
+            }
+            speaker.Rate = 1;
+            speaker.Volume = 100;
+            speaker.Speak(quantity.ToString(), 0);
+        }
+        catch
+        {
+            // SAPI недоступен — короткий сигнал успеха уже прозвучал.
+        }
+        finally
+        {
+            ReleaseCom(token);
+            ReleaseCom(voices);
+            ReleaseCom(voice);
+        }
+    }
+
+    private static void ReleaseCom(object? value)
+    {
+        if (value is null || !Marshal.IsComObject(value)) return;
+        try { Marshal.FinalReleaseComObject(value); }
+        catch { }
     }
 
     private static MediaPlayer CreatePlayer(string path, (int Hz, int Ms, double GapBeforeMs)[] tones)
