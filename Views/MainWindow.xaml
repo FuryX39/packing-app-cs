@@ -285,9 +285,15 @@
                         </Grid.ColumnDefinitions>
                         <Button Content="Обновить" Click="OnReloadFboNew"/>
                         <TextBlock Grid.Column="1" x:Name="FboNewApiHint" VerticalAlignment="Center" Margin="12,0"/>
-                        <Button Grid.Column="2" x:Name="FboNewOverviewHeaderBtn"
-                                Content="Грузоместа" Click="OnFboNewOverviewToggle"
-                                Padding="16,6" FontWeight="SemiBold" MinWidth="140"/>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal">
+                            <Button Content="Печать листов" Click="OnFboNewPrintPalletSheets"
+                                    Padding="14,6" FontWeight="SemiBold"/>
+                            <Button Content="Печать QR поставки" Click="OnFboNewPrintSupplyQr"
+                                    Padding="14,6" FontWeight="SemiBold" Margin="8,0,0,0"/>
+                            <Button x:Name="FboNewOverviewHeaderBtn"
+                                    Content="Грузоместа" Click="OnFboNewOverviewToggle"
+                                    Padding="16,6" FontWeight="SemiBold" MinWidth="140" Margin="8,0,0,0"/>
+                        </StackPanel>
                     </Grid>
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -335,21 +341,6 @@
                                         <TextBox x:Name="FboNewPalletPrintCount" Width="48" Margin="8,0" Text="5"/>
                                         <Button Content="Печать" Click="OnFboNewPrintPallets"/>
                                         <Button Content="Перепечатать последний" Click="OnFboNewReprintLastPallet" Margin="8,0,0,0"/>
-                                    </StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                        <TextBlock Text="QR поставки" VerticalAlignment="Center" Width="80"/>
-                                        <TextBox x:Name="FboNewSupplyQrCopies" Width="48" Margin="8,0" Text="1"/>
-                                        <TextBlock Text="копий" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <Button Content="Печать" Click="OnFboNewPrintSupplyQr"/>
-                                    </StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                        <TextBlock Text="Упак. листы" VerticalAlignment="Center" Width="80"/>
-                                        <TextBlock Text="печатать" VerticalAlignment="Center" Margin="8,0,4,0"/>
-                                        <TextBox x:Name="FboNewSheetPrintCount" Width="48"/>
-                                        <TextBlock Text="из общего" VerticalAlignment="Center" Margin="8,0,4,0"/>
-                                        <TextBox x:Name="FboNewSheetPalletTotal" Width="48"/>
-                                        <Button Content="Печать" Click="OnFboNewPrintPalletSheets" Margin="8,0,0,0"/>
-                                        <TextBlock x:Name="FboNewOccupiedPalletHint" VerticalAlignment="Center" Margin="10,0,0,0" Foreground="#667085"/>
                                     </StackPanel>
                                 </StackPanel>
                             </GroupBox>

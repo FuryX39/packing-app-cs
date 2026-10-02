@@ -155,10 +155,6 @@ public partial class MainWindow
         var pallets = job is null ? "" : $" · паллеты {job.Int("pallet_closed")}/{job.Int("pallet_total")}";
         var pcs = job is null ? "" : $" · шт. {job.Int("pcs_assigned")}/{job.Int("pcs_plan")}";
         FboNewJobStats.Text = $"грузоместа {assigned}/{total} · напечатано {printed} · не печатались {pending}{pallets}{pcs}";
-        var occupiedPallets = job?.Int("occupied_pallet_count") ?? 0;
-        FboNewOccupiedPalletHint.Text = occupiedPallets > 0
-            ? $"пусто = {occupiedPallets} занятых"
-            : "занятых паллет нет";
         RefreshFboNewSelectedText();
         RenderFboNewRemaining();
         RenderFboNewOverview();
@@ -568,18 +564,14 @@ public partial class MainWindow
             MessageBox.Show(this, "Сначала откройте задание", "FBO WB new");
             return;
         }
-        if (!int.TryParse((FboNewSupplyQrCopies.Text ?? "").Trim(), out var copies) ||
-            copies < 1 || copies > 9999)
-        {
-            MessageBox.Show(this, "Укажите количество копий QR от 1 до 9999", "FBO WB new");
-            return;
-        }
+        var copies = ShowFboNewSupplyQrDialog();
+        if (copies is null) return;
         var jobId = _fboNewJob.Int("id");
         await FboNewRunAsync(async () =>
         {
             var pdf = await _client.FboSheetDownloadSupplyQrAsync(jobId);
-            await Task.Run(() => GdiPrinter.PrintPdf(pdf, _config.LabelProfile(), copies));
-            SetStatus($"QR поставки отправлен на печать: {copies} шт.");
+            await Task.Run(() => GdiPrinter.PrintPdf(pdf, _config.LabelProfile(), copies.Value));
+            SetStatus($"QR поставки отправлен на печать: {copies.Value} шт.");
             FocusFboNewScan();
         }, "Печать QR поставки...");
     }
@@ -591,17 +583,9 @@ public partial class MainWindow
             MessageBox.Show(this, "Сначала откройте задание", "FBO WB new");
             return;
         }
-        if (!TryOptionalFboNewCount(FboNewSheetPrintCount.Text, "Количество листов", out var printCount) ||
-            !TryOptionalFboNewCount(FboNewSheetPalletTotal.Text, "Общее количество паллет", out var palletTotal))
-            return;
-        if (printCount is int count && palletTotal is int total && count > total)
-        {
-            MessageBox.Show(
-                this,
-                "Количество листов не может быть больше общего количества паллет",
-                "FBO WB new");
-            return;
-        }
+        var options = ShowFboNewPalletSheetsDialog();
+        if (options is null) return;
+        var (printCount, palletTotal) = options.Value;
         var jobId = _fboNewJob.Int("id");
         await FboNewRunAsync(async () =>
         {
@@ -612,7 +596,170 @@ public partial class MainWindow
         }, "Печать упаковочных листов...");
     }
 
+    private int? ShowFboNewSupplyQrDialog()
+    {
+        var dialog = CreateFboNewPrintDialog("Печать QR поставки", 360);
+        var panel = new StackPanel { Margin = new Thickness(16) };
+        panel.Children.Add(new TextBlock
+        {
+            Text = "Количество QR",
+            Margin = new Thickness(0, 0, 0, 5),
+        });
+        var copiesBox = new TextBox
+        {
+            Text = "1",
+            FontSize = 16,
+            Margin = new Thickness(0, 0, 0, 14),
+        };
+        panel.Children.Add(copiesBox);
+
+        var result = default(int?);
+        panel.Children.Add(CreateFboNewDialogButtons(
+            dialog,
+            () =>
+            {
+                if (!int.TryParse(copiesBox.Text.Trim(), out var copies) || copies < 1 || copies > 9999)
+                {
+                    MessageBox.Show(dialog, "Укажите количество QR от 1 до 9999", "FBO WB new");
+                    copiesBox.Focus();
+                    copiesBox.SelectAll();
+                    return;
+                }
+                result = copies;
+                dialog.DialogResult = true;
+            }));
+        dialog.Content = panel;
+        dialog.Loaded += (_, _) =>
+        {
+            copiesBox.Focus();
+            copiesBox.SelectAll();
+        };
+        return dialog.ShowDialog() == true ? result : null;
+    }
+
+    private (int? PrintCount, int? PalletTotal)? ShowFboNewPalletSheetsDialog()
+    {
+        var dialog = CreateFboNewPrintDialog("Печать упаковочных листов", 430);
+        var panel = new StackPanel { Margin = new Thickness(16) };
+        panel.Children.Add(new TextBlock
+        {
+            Text = "Количество для печати",
+            Margin = new Thickness(0, 0, 0, 5),
+        });
+        var printCountBox = new TextBox
+        {
+            FontSize = 16,
+            Margin = new Thickness(0, 0, 0, 12),
+        };
+        panel.Children.Add(printCountBox);
+        panel.Children.Add(new TextBlock
+        {
+            Text = "Общее количество паллет",
+            Margin = new Thickness(0, 0, 0, 5),
+        });
+        var palletTotalBox = new TextBox
+        {
+            FontSize = 16,
+            Margin = new Thickness(0, 0, 0, 8),
+        };
+        panel.Children.Add(palletTotalBox);
+
+        var occupiedPallets = _fboNewJob?.Int("occupied_pallet_count") ?? 0;
+        panel.Children.Add(new TextBlock
+        {
+            Text = occupiedPallets > 0
+                ? $"Если поля пустые, будут напечатаны листы для {occupiedPallets} занятых паллет."
+                : "Если поля пустые, будут напечатаны листы для всех занятых паллет.",
+            Foreground = Brushes.DimGray,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 14),
+        });
+
+        (int? PrintCount, int? PalletTotal)? result = null;
+        panel.Children.Add(CreateFboNewDialogButtons(
+            dialog,
+            () =>
+            {
+                if (!TryOptionalFboNewCount(
+                        printCountBox.Text,
+                        "Количество для печати",
+                        dialog,
+                        printCountBox,
+                        out var printCount) ||
+                    !TryOptionalFboNewCount(
+                        palletTotalBox.Text,
+                        "Общее количество паллет",
+                        dialog,
+                        palletTotalBox,
+                        out var palletTotal))
+                    return;
+                if (printCount is int count && palletTotal is int total && count > total)
+                {
+                    MessageBox.Show(
+                        dialog,
+                        "Количество для печати не может быть больше общего количества паллет",
+                        "FBO WB new");
+                    printCountBox.Focus();
+                    printCountBox.SelectAll();
+                    return;
+                }
+                result = (printCount, palletTotal);
+                dialog.DialogResult = true;
+            }));
+        dialog.Content = panel;
+        dialog.Loaded += (_, _) => printCountBox.Focus();
+        return dialog.ShowDialog() == true ? result : null;
+    }
+
+    private Window CreateFboNewPrintDialog(string title, double width) => new()
+    {
+        Title = title,
+        Width = width,
+        SizeToContent = SizeToContent.Height,
+        ResizeMode = ResizeMode.NoResize,
+        WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        Owner = this,
+        ShowInTaskbar = false,
+    };
+
+    private static StackPanel CreateFboNewDialogButtons(Window dialog, Action confirm)
+    {
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+        };
+        var printButton = new Button
+        {
+            Content = "Печать",
+            IsDefault = true,
+            MinWidth = 100,
+            Padding = new Thickness(12, 6, 12, 6),
+        };
+        printButton.Click += (_, _) => confirm();
+        var cancelButton = new Button
+        {
+            Content = "Отмена",
+            IsCancel = true,
+            MinWidth = 100,
+            Padding = new Thickness(12, 6, 12, 6),
+            Margin = new Thickness(8, 0, 0, 0),
+        };
+        cancelButton.Click += (_, _) => dialog.Close();
+        buttons.Children.Add(printButton);
+        buttons.Children.Add(cancelButton);
+        return buttons;
+    }
+
     private bool TryOptionalFboNewCount(string? raw, string label, out int? value)
+        => TryOptionalFboNewCount(raw, label, this, null, out value);
+
+    private static bool TryOptionalFboNewCount(
+        string? raw,
+        string label,
+        Window owner,
+        TextBox? input,
+        out int? value)
     {
         var text = (raw ?? "").Trim();
         if (text.Length == 0)
@@ -622,7 +769,9 @@ public partial class MainWindow
         }
         if (!int.TryParse(text, out var parsed) || parsed < 1 || parsed > 200)
         {
-            MessageBox.Show(this, $"{label}: укажите число от 1 до 200", "FBO WB new");
+            MessageBox.Show(owner, $"{label}: укажите число от 1 до 200", "FBO WB new");
+            input?.Focus();
+            input?.SelectAll();
             value = null;
             return false;
         }
