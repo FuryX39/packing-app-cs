@@ -545,6 +545,7 @@ public partial class MainWindow
             ShowFboQtyWarningDialog(qtyWarnings);
             if (printError is not null) throw printError;
             if (closeError is not null) throw closeError;
+            ScanSounds.Ok();
             FocusFboScan();
         }, status);
     }
@@ -601,6 +602,7 @@ public partial class MainWindow
     private void ShowFboError(Exception ex)
     {
         if (ex is OperationCanceledException) return;
+        ScanSounds.Error();
         if (ex is AuthException) { ShowError(ex); return; }
         if (ex is ApiException)
         {

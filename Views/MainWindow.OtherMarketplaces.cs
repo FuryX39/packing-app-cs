@@ -283,6 +283,7 @@ public partial class MainWindow
 
     private void ShowOmScanWarning(string text, string title, bool replaceActive)
     {
+        ScanSounds.Error();
         OmScanWarning.Text = text;
         if (replaceActive)
             OmActiveText.Text = text;
@@ -299,6 +300,7 @@ public partial class MainWindow
         if (_omJob is null || _omSelectedGroup is null) return;
         if (_omSelectedGroup.Flag("require_cis"))
         {
+            ScanSounds.Error();
             MessageBox.Show(this, "Для этого товара нужен КИЗ. Пикните код честного знака.", "Честный знак");
             return;
         }
@@ -312,6 +314,7 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
+            ScanSounds.Error();
             SetStatus(ex.Message);
         }
     }
@@ -341,6 +344,7 @@ public partial class MainWindow
             });
         }
         OmScanWarning.Text = "";
+        ScanSounds.Ok();
         SetStatus(copies > 0 ? $"ШК поставки {barcode}: {copies} шт." : "Строка отмечена");
         OmScanBox.Focus();
     }

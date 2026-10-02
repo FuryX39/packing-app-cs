@@ -499,6 +499,7 @@ public partial class MainWindow
                 RenderFboNewJob();
                 RenderFboNewJobs();
                 SetStatus($"Паллет {closed.Obj("pallet")?.Str("pallet_id") ?? ""} закрыт");
+                ScanSounds.Ok();
                 FocusFboNewScan();
                 return;
             }
@@ -523,6 +524,7 @@ public partial class MainWindow
                 }
                 else
                     SetStatus($"Паллет {palletId}");
+                ScanSounds.Ok();
                 FocusFboNewScan();
                 return;
             }
@@ -534,6 +536,7 @@ public partial class MainWindow
                 if (product is null)
                     throw new ApiException("Товар не распознан");
                 ApplyFboNewProduct(product, resolved.IntOrNull("suggested_qty"));
+                ScanSounds.Ok();
                 SetStatus($"Товар {product.Str("sku")}");
                 return;
             }
@@ -576,6 +579,7 @@ public partial class MainWindow
                 RefreshFboNewSelectedText();
                 RenderFboNewJob();
                 RenderFboNewJobs();
+                ScanSounds.Ok();
                 ShowFboNewQtyWarningDialog(warning);
                 SetStatus($"Грузоместо {box?.Str("box_id") ?? ""} · {qty} шт.");
                 FocusFboNewScan();
@@ -602,6 +606,7 @@ public partial class MainWindow
     private void ShowFboNewError(Exception ex)
     {
         if (ex is OperationCanceledException) return;
+        ScanSounds.Error();
         if (ex is AuthException) { ShowError(ex); return; }
         if (ex is ApiException)
         {

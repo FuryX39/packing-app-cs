@@ -111,6 +111,7 @@ public partial class MainWindow : Window
         _config = config;
         _client = client;
         _photos = new PhotoLoader(Dispatcher);
+        ScanSounds.Init();
         Title = $"Warehouse Packing — {userName}";
         WindowState = WindowState.Maximized;
         FbsSkipMpBox.IsChecked = config.SkipMpConfirm;
@@ -1352,6 +1353,7 @@ public partial class MainWindow : Window
                 _fbsJob = payload.Obj("job") ?? _fbsJob;
                 RenderFbsJob();
                 var left = ActiveLines().Count;
+                ScanSounds.Ok();
                 SetStatus(left > 0 ? $"Ярлык принят · осталось пропикать: {left}" : "Ярлык принят, строка закрыта");
                 FocusScan();
             }, "Сверка ярлыка...");
@@ -1539,13 +1541,19 @@ public partial class MainWindow : Window
             RenderFbsJob();
             if (printError is not null)
             {
+                ScanSounds.Error();
                 MessageBox.Show(this, printError.Message, "Печать", MessageBoxButton.OK, MessageBoxImage.Error);
                 SetStatus($"Получено ярлыков: {printed}. Можно Перепечатать");
                 FocusScan();
                 return;
             }
             if (closeError is not null)
+            {
+                ScanSounds.Error();
                 MessageBox.Show(this, $"Ярлык напечатан, но строка не закрыта: {closeError.Message}", "FBS", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            else
+                ScanSounds.Ok();
             var sku = line?.Str("sku") ?? "";
             var cis = line?.Flag("has_cis") == true ? " · КИЗ записан" : "";
             if (printed > 1)
@@ -1613,6 +1621,7 @@ public partial class MainWindow : Window
     private void ShowFbsError(Exception ex)
     {
         if (ex is OperationCanceledException) return;
+        ScanSounds.Error();
         if (ex is AuthException) { ShowError(ex); return; }
         if (ex is ApiException)
         {
