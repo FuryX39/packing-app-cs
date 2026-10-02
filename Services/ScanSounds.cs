@@ -73,16 +73,40 @@ internal static class ScanSounds
 
     private static void SpeakQuantity(int quantity)
     {
+        var path = Path.Combine(Path.GetTempPath(), "WarehousePacking", "quantity_voice.wav");
+        if (TryRenderQuantity(quantity, path))
+        {
+            AmplifyPcm16Wave(path, 2.5);
+            try
+            {
+                using var player = new System.Media.SoundPlayer(path);
+                player.PlaySync();
+                return;
+            }
+            catch
+            {
+                // Не удалось проиграть WAV — пробуем прямой вывод SAPI.
+            }
+        }
+        SpeakQuantityDirect(quantity);
+    }
+
+    private static bool TryRenderQuantity(int quantity, string path)
+    {
         object? voice = null;
         object? voices = null;
         object? token = null;
+        object? stream = null;
         try
         {
             var voiceType = Type.GetTypeFromProgID("SAPI.SpVoice");
-            if (voiceType is null) return;
+            var streamType = Type.GetTypeFromProgID("SAPI.SpFileStream");
+            if (voiceType is null || streamType is null) return false;
             voice = Activator.CreateInstance(voiceType);
-            if (voice is null) return;
+            stream = Activator.CreateInstance(streamType);
+            if (voice is null || stream is null) return false;
             dynamic speaker = voice;
+            dynamic fileStream = stream;
             try
             {
                 voices = speaker.GetVoices("Language=419", "");
@@ -99,6 +123,48 @@ internal static class ScanSounds
             }
             speaker.Rate = 1;
             speaker.Volume = 100;
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            if (File.Exists(path)) File.Delete(path);
+            fileStream.Open(path, 3, false);
+            speaker.AudioOutputStream = fileStream;
+            speaker.Speak(quantity.ToString(), 0);
+            fileStream.Close();
+            return File.Exists(path) && new FileInfo(path).Length > 44;
+        }
+        catch
+        {
+            try
+            {
+                if (stream is not null)
+                {
+                    dynamic fileStream = stream;
+                    fileStream.Close();
+                }
+            }
+            catch { }
+            return false;
+        }
+        finally
+        {
+            ReleaseCom(token);
+            ReleaseCom(voices);
+            ReleaseCom(stream);
+            ReleaseCom(voice);
+        }
+    }
+
+    private static void SpeakQuantityDirect(int quantity)
+    {
+        object? voice = null;
+        try
+        {
+            var voiceType = Type.GetTypeFromProgID("SAPI.SpVoice");
+            if (voiceType is null) return;
+            voice = Activator.CreateInstance(voiceType);
+            if (voice is null) return;
+            dynamic speaker = voice;
+            speaker.Rate = 1;
+            speaker.Volume = 100;
             speaker.Speak(quantity.ToString(), 0);
         }
         catch
@@ -107,10 +173,51 @@ internal static class ScanSounds
         }
         finally
         {
-            ReleaseCom(token);
-            ReleaseCom(voices);
             ReleaseCom(voice);
         }
+    }
+
+    private static void AmplifyPcm16Wave(string path, double gain)
+    {
+        try
+        {
+            var data = File.ReadAllBytes(path);
+            var fmt = FindWaveChunk(data, "fmt ");
+            var audio = FindWaveChunk(data, "data");
+            if (fmt < 0 || audio < 0 || fmt + 24 > data.Length || audio + 8 > data.Length)
+                return;
+            if (BitConverter.ToInt16(data, fmt + 8) != 1 ||
+                BitConverter.ToInt16(data, fmt + 22) != 16)
+                return;
+            var size = Math.Min(BitConverter.ToInt32(data, audio + 4), data.Length - audio - 8);
+            for (var offset = audio + 8; offset + 1 < audio + 8 + size; offset += 2)
+            {
+                var sample = BitConverter.ToInt16(data, offset);
+                var amplified = (int)Math.Round(sample * gain);
+                var clipped = (short)Math.Clamp(amplified, short.MinValue, short.MaxValue);
+                data[offset] = (byte)(clipped & 0xff);
+                data[offset + 1] = (byte)((clipped >> 8) & 0xff);
+            }
+            File.WriteAllBytes(path, data);
+        }
+        catch
+        {
+            // Если формат неожиданен, воспроизводим исходный WAV.
+        }
+    }
+
+    private static int FindWaveChunk(byte[] data, string name)
+    {
+        var offset = 12;
+        while (offset + 8 <= data.Length)
+        {
+            if (System.Text.Encoding.ASCII.GetString(data, offset, 4) == name)
+                return offset;
+            var size = BitConverter.ToInt32(data, offset + 4);
+            if (size < 0) return -1;
+            offset += 8 + size + (size & 1);
+        }
+        return -1;
     }
 
     private static void ReleaseCom(object? value)
