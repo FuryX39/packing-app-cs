@@ -80,6 +80,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _fboOpenCts;
     private readonly DispatcherTimer _fboSelectTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private int _fboPendingJobId;
+    private string _fboPendingPlatform = "";
     private string _fboActiveImageUrl = "";
     private string _fboQtyWarning = "";
 
@@ -133,6 +134,8 @@ public partial class MainWindow : Window
         FboNewByProductList.ItemsSource = _fboNewByProductRows;
         FboNewByCargoList.ItemsSource = _fboNewByCargoRows;
         FboNewByPalletList.ItemsSource = _fboNewByPalletRows;
+        FboYmRemainingGrid.ItemsSource = _ymRemainingRows;
+        FboYmCargoGrid.ItemsSource = _ymCargoRows;
         OmJobsGrid.ItemsSource = _omJobRows;
         OmLinesGrid.ItemsSource = _omLineRows;
         OmRemainingGrid.ItemsSource = _omRemainingRows;
@@ -153,7 +156,7 @@ public partial class MainWindow : Window
         {
             _fboSelectTimer.Stop();
             if (_fboPendingJobId > 0)
-                _ = OpenFboJobAsync(_fboPendingJobId);
+                _ = OpenSelectedFboJobAsync();
         };
         _fboNewSelectTimer.Tick += (_, _) =>
         {
@@ -174,6 +177,7 @@ public partial class MainWindow : Window
         _fboNewSelectTimer.Stop();
         _fbsOpenCts?.Cancel();
         _fboOpenCts?.Cancel();
+        _ymOpenCts?.Cancel();
         _fboNewOpenCts?.Cancel();
         await _client.LogoutAsync();
         _client.Dispose();

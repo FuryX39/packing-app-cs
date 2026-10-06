@@ -41,10 +41,29 @@ public partial class MainWindow
         try
         {
             _fboJobs = await _client.FboMyJobsAsync();
-            var selected = _fboPendingJobId > 0 ? _fboPendingJobId : _fboJob?.IntOrNull("id");
+            try
+            {
+                var ymJobs = await _client.YandexFboMyJobsAsync();
+                _fboJobs = _fboJobs.Concat(ymJobs)
+                    .OrderByDescending(j => j.Int("created_at_ts", j.Int("id")))
+                    .ThenByDescending(j => j.Int("id"))
+                    .ToList();
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Старый API или сбой FBO YM: вкладка остаётся рабочей для WB.
+            }
+            var selected = _fboPendingJobId > 0 ? _fboPendingJobId : (_ymJob ?? _fboJob)?.IntOrNull("id");
+            var selectedPlatform = _fboPendingJobId > 0
+                ? _fboPendingPlatform
+                : _ymJob is not null ? FboPlatformYm
+                : _fboJob is not null ? FboJobPlatform(_fboJob)
+                : "";
             if (selected is int sid)
             {
-                var idx = _fboJobs.FindIndex(j => j.Int("id") == sid);
+                var idx = _fboJobs.FindIndex(j =>
+                    j.Int("id") == sid &&
+                    (selectedPlatform.Length == 0 || FboJobPlatform(j) == selectedPlatform));
                 if (idx >= 0) _fboJobsPage = idx / Paging.PageSize;
             }
             RenderFboJobs();
@@ -65,13 +84,22 @@ public partial class MainWindow
             _fboJobRows.Add(new FbsJobRow
             {
                 Id = j.Int("id"),
+                Platform = FboJobPlatform(j),
+                PlatformLabel = FboPlatformLabel(j),
                 Status = Paging.JobStatusRu(j.Str("status")),
                 Progress = $"{j.Int("line_done")}/{j.Int("line_total")}",
             });
         }
-        var selected = _fboPendingJobId > 0 ? _fboPendingJobId : _fboJob?.IntOrNull("id");
+        var selected = _fboPendingJobId > 0 ? _fboPendingJobId : (_ymJob ?? _fboJob)?.IntOrNull("id");
+        var selectedPlatform = _fboPendingJobId > 0
+            ? _fboPendingPlatform
+            : _ymJob is not null ? FboPlatformYm
+            : _fboJob is not null ? FboJobPlatform(_fboJob)
+            : "";
         if (selected is int sid)
-            FboJobsGrid.SelectedItem = _fboJobRows.FirstOrDefault(x => x.Id == sid);
+            FboJobsGrid.SelectedItem = _fboJobRows.FirstOrDefault(x =>
+                x.Id == sid &&
+                (selectedPlatform.Length == 0 || x.Platform == selectedPlatform));
         _fboJobsFilling = false;
         FboJobsPageLabel.Text = Paging.RangeLabel(_fboJobs.Count, _fboJobsPage);
         FboJobsPrev.IsEnabled = _fboJobsPage > 0;
@@ -92,6 +120,7 @@ public partial class MainWindow
     {
         if (_fboJobsFilling || FboJobsGrid.SelectedItem is not FbsJobRow row) return;
         _fboPendingJobId = row.Id;
+        _fboPendingPlatform = row.Platform;
         _fboSelectTimer.Stop();
         _fboSelectTimer.Start();
     }
@@ -110,6 +139,7 @@ public partial class MainWindow
             var job = await _client.FboOpenJobAsync(jobId, cts.Token);
             if (!ReferenceEquals(_fboOpenCts, cts)) return;
             _fboJob = job;
+            ApplyFboMarketplaceUi(FboPlatformWb);
             RenderFboJob();
             FocusFboScan();
         }

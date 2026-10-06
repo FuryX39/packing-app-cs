@@ -294,6 +294,33 @@ public sealed class ApiClient : IDisposable
     public Task<byte[]> FboDownloadPalletSheetsAsync(int jobId, CancellationToken ct = default) =>
         ApiBytesAsync($"/api/v1/fbo-packing/jobs/{jobId}/pallet-sheets.pdf", 120, ct);
 
+    public async Task<List<JsonMap>> YandexFboMyJobsAsync(CancellationToken ct = default)
+    {
+        var body = await ApiJsonAsync("GET", "/api/v1/yandex-fbo-packing/my", null, 30, ct);
+        return body.Arr("jobs");
+    }
+
+    public async Task<JsonMap> YandexFboOpenJobAsync(int jobId, CancellationToken ct = default)
+    {
+        var body = await ApiJsonAsync("GET", $"/api/v1/yandex-fbo-packing/jobs/{jobId}/pack", null, 30, ct);
+        return body.Obj("job") ?? body;
+    }
+
+    public Task<JsonMap> YandexFboResolveAsync(int jobId, string barcode, CancellationToken ct = default) =>
+        ApiJsonAsync("POST", $"/api/v1/yandex-fbo-packing/jobs/{jobId}/resolve", new { barcode }, 30, ct);
+
+    public Task<JsonMap> YandexFboAssignAsync(
+        int jobId, int productId, int quantity, string cargoCode, CancellationToken ct = default) =>
+        ApiJsonAsync("POST", $"/api/v1/yandex-fbo-packing/jobs/{jobId}/assign", new
+        {
+            product_id = productId,
+            quantity,
+            cargo_code = cargoCode,
+        }, 30, ct);
+
+    public Task<byte[]> YandexFboLabelsPdfAsync(int jobId, CancellationToken ct = default) =>
+        ApiBytesAsync($"/api/v1/yandex-fbo-packing/jobs/{jobId}/labels.pdf", 60, ct);
+
     public async Task<List<JsonMap>> FboSheetMyJobsAsync(CancellationToken ct = default)
     {
         var body = await ApiJsonAsync("GET", "/api/v1/fbo-sheet-packing/my", null, 30, ct);

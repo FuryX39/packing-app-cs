@@ -95,7 +95,7 @@ internal static class Smoke
         main.Show();
         Pump();
 
-        foreach (var (index, name) in new[] { (0, "tasks"), (1, "fbs"), (2, "catalog") })
+        foreach (var (index, name) in new[] { (0, "fbo"), (2, "fbs"), (3, "catalog") })
         {
             main.Tabs.SelectedIndex = index;
             Pump();
@@ -104,7 +104,7 @@ internal static class Smoke
 
         CheckFbsJobOpens(main);
 
-        main.Tabs.SelectedIndex = 2;
+        main.Tabs.SelectedIndex = 3;
         if (!WaitFor(() => main.CatalogGrid.Items.Count > 0))
         {
             Fail("catalog stayed empty");
@@ -204,7 +204,7 @@ internal static class Smoke
     /// torn down and rebuilt while the selection is being handled.
     private static void CheckFbsJobOpens(MainWindow main)
     {
-        main.Tabs.SelectedIndex = 1;
+        main.Tabs.SelectedIndex = 2;
         if (!WaitFor(() => main.FbsJobsGrid.Items.Count > 0))
         {
             Fail("fbs job list stayed empty");
@@ -349,10 +349,12 @@ internal static class Smoke
                 "/api/warehouse/tasks/statuses" => """{"task_statuses":[{"id":1,"name":"Новый"},{"id":2,"name":"В работе"}]}""",
                 "/api/warehouse/catalog/products" =>
                     """{"products":[{"id":1,"sku":"SS288","name":"Ошейник светоотражающий","image_url":""},{"id":2,"sku":"SS864","name":"Поводок нейлоновый","image_url":""}]}""",
-                "/api/v1/fbs-packing/my" => """{"jobs":[{"id":49,"status":"in_progress","line_done":1,"line_total":3}]}""",
+                "/api/v1/fbs-packing/my" => """{"jobs":[{"id":49,"marketplace":"wildberries","transfer_number":"49","status":"in_progress","line_done":1,"line_total":3}]}""",
+                "/api/v1/fbo-packing/my" => """{"jobs":[]}""",
+                "/api/v1/yandex-fbo-packing/my" => """{"jobs":[]}""",
                 "/api/v1/fbs-packing/jobs/49/pack" =>
                     """
-                    {"job":{"id":49,"status":"in_progress","line_done":1,"line_total":2,"line_pending":1,
+                    {"job":{"id":49,"marketplace":"wildberries","transfer_number":"49","status":"in_progress","line_done":1,"line_total":2,"line_pending":1,
                     "lines":[{"id":901,"seq":"1","sku":"SS288","product_name":"Ошейник","order_id":"275254385","status":"pending","image_url":""},
                     {"id":902,"seq":"2","sku":"SS864","product_name":"Поводок","order_id":"275254413","status":"done","image_url":""}],
                     "remaining_groups":[{"sku":"SS288","name":"Ошейник","quantity":1,"barcode":"4600000000001","image_url":""}]}}

@@ -86,16 +86,21 @@ public partial class MainWindow
                 .Select(task => new ProductivityTaskRow(
                     task.Str("task_type_name"),
                     task.Str("task_data"),
-                    task.Int("quantity")))
+                    task.Int("quantity"),
+                    task.Str("pay")))
                 .ToList();
             _productivityDays.Add(new ProductivityDayRow(
                 day.Str("display_date"),
                 day.Int("quantity"),
+                day.Str("pay"),
                 tasks));
         }
 
         ProductivityMonthText.Text = _productivityMonth.ToString("MMMM yyyy");
-        ProductivityTotalText.Text = $"Всего: {data.Int("total_quantity")} шт.";
+        var totalPay = data.Str("total_pay");
+        ProductivityTotalText.Text = string.IsNullOrWhiteSpace(totalPay)
+            ? $"Всего: {data.Int("total_quantity")} шт."
+            : $"Всего: {data.Int("total_quantity")} шт.  {totalPay} ₽";
         ProductivityEmptyText.Visibility =
             _productivityDays.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         SetStatus("Выработка загружена");
@@ -154,9 +159,19 @@ public partial class MainWindow
 public sealed record ProductivityTaskRow(
     string TaskType,
     string TaskData,
-    int Quantity);
+    int Quantity,
+    string PayText)
+{
+    public string QuantityText =>
+        string.IsNullOrWhiteSpace(PayText) ? $"{Quantity} шт." : $"{Quantity} шт.  {PayText} ₽";
+}
 
 public sealed record ProductivityDayRow(
     string Date,
     int Quantity,
-    IReadOnlyList<ProductivityTaskRow> Tasks);
+    string PayText,
+    IReadOnlyList<ProductivityTaskRow> Tasks)
+{
+    public string QuantityText =>
+        string.IsNullOrWhiteSpace(PayText) ? $"{Quantity} шт." : $"{Quantity} шт.  {PayText} ₽";
+}

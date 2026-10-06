@@ -151,20 +151,21 @@
                 <DockPanel Margin="6">
                     <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <Button DockPanel.Dock="Left" Content="Обновить" Click="OnReloadFbo"/>
-                        <Button DockPanel.Dock="Left" Content="Скачать ярлыки" Click="OnDownloadFboLabels"/>
-                        <Button DockPanel.Dock="Left" Content="Печать QR поставки" Click="OnPrintFboSupplyQr"/>
-                        <Button DockPanel.Dock="Left" Content="Печать листов" Click="OnPrintFboPalletSheets"/>
+                        <Button x:Name="FboWbDownloadLabels" DockPanel.Dock="Left" Content="Скачать ярлыки" Click="OnDownloadFboLabels"/>
+                        <Button x:Name="FboWbPrintQr" DockPanel.Dock="Left" Content="Печать QR поставки" Click="OnPrintFboSupplyQr"/>
+                        <Button x:Name="FboWbPrintSheets" DockPanel.Dock="Left" Content="Печать листов" Click="OnPrintFboPalletSheets"/>
+                        <Button x:Name="FboYmPrintCargos" DockPanel.Dock="Left" Content="Печать грузомест" Click="OnYmPrintCargos" Visibility="Collapsed"/>
                         <TextBlock x:Name="FboCacheHint" VerticalAlignment="Center" Margin="12,0,0,0" Foreground="#555"/>
                         <TextBlock x:Name="FboApiHint" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </DockPanel>
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="260" MinWidth="200"/>
+                            <ColumnDefinition Width="280" MinWidth="200"/>
                             <ColumnDefinition Width="6"/>
                             <ColumnDefinition Width="*" MinWidth="480"/>
                         </Grid.ColumnDefinitions>
                         <DockPanel>
-                            <TextBlock DockPanel.Dock="Top" Text="Мои задания FBO WB" Margin="0,0,0,4"/>
+                            <TextBlock x:Name="FboJobsHeader" DockPanel.Dock="Top" Text="Мои задания FBO" Margin="0,0,0,4"/>
                             <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,4,0,0">
                                 <Button Content="Назад" Click="OnFboJobsPrev" x:Name="FboJobsPrev"/>
                                 <TextBlock x:Name="FboJobsPageLabel" VerticalAlignment="Center" Margin="8,0"/>
@@ -174,14 +175,16 @@
                                       SelectionChanged="OnFboJobSelected">
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="№" Binding="{Binding Id}" Width="52" ElementStyle="{StaticResource CellText}"/>
+                                    <DataGridTextColumn Header="Площадка" Binding="{Binding PlatformLabel}" Width="56" ElementStyle="{StaticResource CellText}"/>
                                     <DataGridTextColumn Header="Статус" Binding="{Binding Status}" Width="*" ElementStyle="{StaticResource CellText}"/>
                                     <DataGridTextColumn Header="Готово" Binding="{Binding Progress}" Width="72" ElementStyle="{StaticResource CellText}"/>
                                 </DataGrid.Columns>
                             </DataGrid>
                         </DockPanel>
                         <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Stretch"/>
-                        <DockPanel Grid.Column="2">
-                            <DockPanel DockPanel.Dock="Top">
+                        <Grid Grid.Column="2">
+                            <DockPanel x:Name="FboWbPanel">
+                                <DockPanel DockPanel.Dock="Top">
                                 <TextBlock x:Name="FboJobTitle" Text="Выберите задание" FontWeight="SemiBold" FontSize="14"/>
                                 <TextBlock x:Name="FboJobStats" HorizontalAlignment="Right"/>
                             </DockPanel>
@@ -272,6 +275,59 @@
                                 </DockPanel>
                             </GroupBox>
                         </DockPanel>
+                            <DockPanel x:Name="FboYmPanel" Visibility="Collapsed">
+                                <DockPanel DockPanel.Dock="Top">
+                                    <TextBlock x:Name="FboYmJobTitle" Text="Выберите задание YM" FontWeight="SemiBold" FontSize="14"/>
+                                    <TextBlock x:Name="FboYmJobStats" HorizontalAlignment="Right"/>
+                                </DockPanel>
+                                <GroupBox Header="Товар и грузоместо" DockPanel.Dock="Top" Margin="0,8" Padding="8">
+                                    <DockPanel>
+                                        <Border DockPanel.Dock="Left" Width="110" Height="110" Background="#F3F3F3" BorderBrush="#CCC" BorderThickness="1" Margin="0,0,10,0">
+                                            <Image x:Name="FboYmActiveImage" Stretch="Uniform"/>
+                                        </Border>
+                                        <StackPanel>
+                                            <TextBlock x:Name="FboYmActiveText" Text="Сначала отсканируйте товар" TextWrapping="Wrap"/>
+                                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                                <TextBlock Text="Количество" VerticalAlignment="Center" Width="90"/>
+                                                <TextBox x:Name="FboYmQtyBox" Width="80" Margin="8,0" KeyDown="OnYmQtyKey"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </DockPanel>
+                                </GroupBox>
+                                <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                                    <TextBlock Text="Сканер" VerticalAlignment="Center"/>
+                                    <Button DockPanel.Dock="Right" Content="OK" Click="OnYmScan"/>
+                                    <TextBox x:Name="FboYmScanBox" Margin="8,0" KeyDown="OnYmScanKey"/>
+                                </DockPanel>
+                                <GroupBox Header="Остаток к сборке" DockPanel.Dock="Top" Height="200" Margin="0,0,0,8">
+                                    <DataGrid x:Name="FboYmRemainingGrid" Style="{StaticResource RowLinesGrid}"
+                                              MouseDoubleClick="OnYmRemainingPick">
+                                        <DataGrid.Columns>
+                                            <DataGridTemplateColumn Header="Фото" Width="48" CanUserResize="False">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <Image Source="{Binding Photo}" Width="30" Height="30" Stretch="Uniform"/>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                            <DataGridTextColumn Header="Артикул" Binding="{Binding Sku}" Width="100" ElementStyle="{StaticResource CellText}"/>
+                                            <DataGridTextColumn Header="Название" Binding="{Binding Name}" Width="*" ElementStyle="{StaticResource CellText}"/>
+                                            <DataGridTextColumn Header="Ост." Binding="{Binding Qty}" Width="52" ElementStyle="{StaticResource CellText}"/>
+                                            <DataGridTextColumn Header="ШК" Binding="{Binding Barcode}" Width="120" ElementStyle="{StaticResource CellText}"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </GroupBox>
+                                <GroupBox Header="Грузоместа" Padding="6">
+                                    <DataGrid x:Name="FboYmCargoGrid" Style="{StaticResource RowLinesGrid}">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="Код" Binding="{Binding Sku}" Width="200" ElementStyle="{StaticResource CellText}"/>
+                                            <DataGridTextColumn Header="Содержимое" Binding="{Binding Name}" Width="*" ElementStyle="{StaticResource CellText}"/>
+                                            <DataGridTextColumn Header="Шт." Binding="{Binding Qty}" Width="52" ElementStyle="{StaticResource CellText}"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </GroupBox>
+                            </DockPanel>
+                    </Grid>
                     </Grid>
                 </DockPanel>
             </TabItem>
@@ -826,7 +882,7 @@
                                                 Background="White">
                                             <Expander>
                                                 <Expander.Header>
-                                                    <Grid Margin="8,7" Width="560">
+                                                    <Grid Margin="8,7" Width="640">
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="*"/>
                                                             <ColumnDefinition Width="Auto"/>
@@ -834,7 +890,7 @@
                                                         <TextBlock Text="{Binding Date}"
                                                                    FontSize="16" FontWeight="SemiBold"/>
                                                         <TextBlock Grid.Column="1"
-                                                                   Text="{Binding Quantity, StringFormat={}{0} шт.}"
+                                                                   Text="{Binding QuantityText}"
                                                                    FontSize="16" FontWeight="SemiBold"
                                                                    Foreground="#245A88"/>
                                                     </Grid>
@@ -846,7 +902,7 @@
                                                                 <Grid.ColumnDefinitions>
                                                                     <ColumnDefinition Width="130"/>
                                                                     <ColumnDefinition Width="*"/>
-                                                                    <ColumnDefinition Width="80"/>
+                                                                    <ColumnDefinition Width="Auto"/>
                                                                 </Grid.ColumnDefinitions>
                                                                 <TextBlock Text="{Binding TaskType}"
                                                                            FontWeight="SemiBold"/>
@@ -855,7 +911,7 @@
                                                                            TextWrapping="Wrap"
                                                                            Foreground="#444"/>
                                                                 <TextBlock Grid.Column="2"
-                                                                           Text="{Binding Quantity, StringFormat={}{0} шт.}"
+                                                                           Text="{Binding QuantityText}"
                                                                            HorizontalAlignment="Right"
                                                                            FontWeight="SemiBold"/>
                                                             </Grid>
