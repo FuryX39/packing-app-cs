@@ -63,7 +63,18 @@ public sealed class ApiClient : IDisposable
 
     public async Task<List<JsonMap>> GetLoginUsersAsync(CancellationToken ct = default)
     {
-        var body = await ApiJsonAsync("GET", "/api/v1/login/users", null, 20, ct);
+        if (ApiUrl.Length == 0)
+            throw new ApiException("Не задан адрес API (run_api.py)");
+        using var resp = await SendAsync(
+            _apiHttp,
+            "GET",
+            Api("/api/v1/login/users"),
+            null,
+            20,
+            ct);
+        var text = await ReadTextAsync(resp, 20, ct);
+        Raise(resp, text);
+        var body = JsonMap.Parse(text);
         return body.Arr("users");
     }
 
