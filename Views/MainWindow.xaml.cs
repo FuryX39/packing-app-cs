@@ -136,6 +136,7 @@ public partial class MainWindow : Window
         OmJobsGrid.ItemsSource = _omJobRows;
         OmLinesGrid.ItemsSource = _omLineRows;
         OmRemainingGrid.ItemsSource = _omRemainingRows;
+        InitializeProductivity();
 
         _tasksTimer.Tick += (_, _) =>
         {
@@ -199,6 +200,7 @@ public partial class MainWindow : Window
     private void OnTabChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!IsLoaded || !ReferenceEquals(e.OriginalSource, Tabs)) return;
+        if (HandleProductivityTabChange()) return;
         switch (Tabs.SelectedIndex)
         {
             case 0:

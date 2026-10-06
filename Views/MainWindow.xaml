@@ -781,6 +781,101 @@
                     </Grid>
                 </DockPanel>
             </TabItem>
+            <TabItem Header="Выработка">
+                <Grid Margin="18">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <DockPanel Margin="0,0,0,14">
+                        <StackPanel DockPanel.Dock="Left">
+                            <TextBlock Text="Моя выработка" FontSize="22" FontWeight="SemiBold"/>
+                            <TextBlock Text="Упакованные товары по дням и заданиям"
+                                       Foreground="#666" Margin="0,3,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="ProductivityTotalText" DockPanel.Dock="Right"
+                                   VerticalAlignment="Center" FontSize="18"
+                                   FontWeight="SemiBold"/>
+                    </DockPanel>
+                    <Border Grid.Row="1" Background="#F4F6F8" CornerRadius="6"
+                            Padding="10" Margin="0,0,0,12">
+                        <DockPanel>
+                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                                <Button Content="‹" Width="38" FontSize="18"
+                                        Click="OnProductivityPreviousMonth"/>
+                                <DatePicker x:Name="ProductivityMonthPicker"
+                                            Width="145" Margin="8,0"/>
+                                <Button Content="Показать" Click="OnProductivityReload"/>
+                                <Button Content="›" Width="38" FontSize="18" Margin="8,0,0,0"
+                                        Click="OnProductivityNextMonth"/>
+                            </StackPanel>
+                            <TextBlock x:Name="ProductivityMonthText"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Center"
+                                       FontSize="16" FontWeight="SemiBold"/>
+                        </DockPanel>
+                    </Border>
+                    <Grid Grid.Row="2">
+                        <TextBlock x:Name="ProductivityEmptyText"
+                                   Text="За выбранный месяц выработки нет."
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Foreground="#777" FontSize="15"
+                                   Visibility="Collapsed"/>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <ItemsControl x:Name="ProductivityDays">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border BorderBrush="#D7DCE1" BorderThickness="1"
+                                                CornerRadius="6" Margin="0,0,0,8"
+                                                Background="White">
+                                            <Expander>
+                                                <Expander.Header>
+                                                    <Grid Margin="8,7" Width="560">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{Binding Date}"
+                                                                   FontSize="16" FontWeight="SemiBold"/>
+                                                        <TextBlock Grid.Column="1"
+                                                                   Text="{Binding Quantity, StringFormat={}{0} шт.}"
+                                                                   FontSize="16" FontWeight="SemiBold"
+                                                                   Foreground="#245A88"/>
+                                                    </Grid>
+                                                </Expander.Header>
+                                                <ItemsControl ItemsSource="{Binding Tasks}" Margin="36,0,14,12">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Grid Margin="0,5">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="130"/>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="80"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <TextBlock Text="{Binding TaskType}"
+                                                                           FontWeight="SemiBold"/>
+                                                                <TextBlock Grid.Column="1"
+                                                                           Text="{Binding TaskData}"
+                                                                           TextWrapping="Wrap"
+                                                                           Foreground="#444"/>
+                                                                <TextBlock Grid.Column="2"
+                                                                           Text="{Binding Quantity, StringFormat={}{0} шт.}"
+                                                                           HorizontalAlignment="Right"
+                                                                           FontWeight="SemiBold"/>
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </Expander>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+                </Grid>
+            </TabItem>
         </TabControl>
     </DockPanel>
 </Window>

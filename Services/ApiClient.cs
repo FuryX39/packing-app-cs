@@ -93,6 +93,18 @@ public sealed class ApiClient : IDisposable
     public Task<List<JsonMap>> GetTaskStatusesAsync(CancellationToken ct = default) =>
         GetListAsync("/api/warehouse/tasks/statuses", "task_statuses", ct);
 
+    public Task<JsonMap> GetMyProductivityAsync(
+        string password,
+        int year,
+        int month,
+        CancellationToken ct = default) =>
+        ApiJsonAsync(
+            "POST",
+            "/api/v1/productivity/my",
+            new { password, year, month },
+            30,
+            ct);
+
     public async Task<JsonMap> PatchTaskAsync(int taskId, object body, CancellationToken ct = default)
     {
         var json = await WebJsonAsync("PATCH", $"/api/warehouse/tasks/{taskId}", body, 30, ct);
