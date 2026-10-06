@@ -27,7 +27,20 @@
         <TextBox x:Name="ApiBox" Grid.Row="2" Grid.Column="1" Margin="0,4"/>
         <TextBlock Grid.Row="3" Grid.Column="1" Text="пусто = тот же хост :8766 (run_api.py)" Foreground="#666" FontSize="11"/>
         <TextBlock Grid.Row="4" Text="Логин" VerticalAlignment="Center" Margin="0,4"/>
-        <TextBox x:Name="LoginBox" Grid.Row="4" Grid.Column="1" Margin="0,4"/>
+        <ComboBox x:Name="LoginBox" Grid.Row="4" Grid.Column="1" Margin="0,4"
+                  IsEditable="True" IsTextSearchEnabled="True"
+                  TextSearch.TextPath="Login"
+                  SelectionChanged="OnLoginSelected">
+            <ComboBox.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{Binding DisplayName}"/>
+                        <TextBlock Text="{Binding Login, StringFormat={}  ({0})}"
+                                   Foreground="#666"/>
+                    </StackPanel>
+                </DataTemplate>
+            </ComboBox.ItemTemplate>
+        </ComboBox>
         <TextBlock Grid.Row="5" Text="Пароль" VerticalAlignment="Center" Margin="0,4"/>
         <PasswordBox x:Name="PasswordBox" Grid.Row="5" Grid.Column="1" Margin="0,4"/>
         <TextBlock x:Name="StatusText" Grid.Row="6" Grid.ColumnSpan="2" Foreground="#555" Margin="0,8,0,0"/>

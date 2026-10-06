@@ -800,21 +800,16 @@
                     </DockPanel>
                     <Border Grid.Row="1" Background="#F4F6F8" CornerRadius="6"
                             Padding="10" Margin="0,0,0,12">
-                        <DockPanel>
-                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                                <Button Content="‹" Width="38" FontSize="18"
-                                        Click="OnProductivityPreviousMonth"/>
-                                <DatePicker x:Name="ProductivityMonthPicker"
-                                            Width="145" Margin="8,0"/>
-                                <Button Content="Показать" Click="OnProductivityReload"/>
-                                <Button Content="›" Width="38" FontSize="18" Margin="8,0,0,0"
-                                        Click="OnProductivityNextMonth"/>
-                            </StackPanel>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <Button Content="‹" Width="38" FontSize="18"
+                                    Click="OnProductivityPreviousMonth"/>
                             <TextBlock x:Name="ProductivityMonthText"
-                                       HorizontalAlignment="Right"
+                                       Width="180" TextAlignment="Center"
                                        VerticalAlignment="Center"
                                        FontSize="16" FontWeight="SemiBold"/>
-                        </DockPanel>
+                            <Button Content="›" Width="38" FontSize="18"
+                                    Click="OnProductivityNextMonth"/>
+                        </StackPanel>
                     </Border>
                     <Grid Grid.Row="2">
                         <TextBlock x:Name="ProductivityEmptyText"

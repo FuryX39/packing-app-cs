@@ -14,7 +14,35 @@ public partial class LoginWindow : Window
         InitializeComponent();
         ServerBox.Text = Config.ServerUrl;
         ApiBox.Text = Config.ApiUrl;
+        Loaded += async (_, _) => await LoadLoginUsersAsync();
         LoginBox.Focus();
+    }
+
+    private async Task LoadLoginUsersAsync()
+    {
+        var typedLogin = LoginBox.Text.Trim();
+        try
+        {
+            using var client = new ApiClient(
+                ServerBox.Text.Trim().TrimEnd('/'),
+                ApiBox.Text.Trim().TrimEnd('/'));
+            var users = await client.GetLoginUsersAsync();
+            LoginBox.ItemsSource = users
+                .Select(user => new LoginUserOption(
+                    user.Str("login"),
+                    user.Str("display_name", user.Str("login"))))
+                .Where(user => user.Login.Length > 0)
+                .ToList();
+            LoginBox.Text = typedLogin;
+            StatusText.Text = users.Count > 0
+                ? "Выберите сотрудника и введите пароль"
+                : "Активные сотрудники не найдены";
+        }
+        catch
+        {
+            LoginBox.Text = typedLogin;
+            StatusText.Text = "Список сотрудников недоступен, логин можно ввести вручную";
+        }
     }
 
     private void OnSettings(object sender, RoutedEventArgs e)
@@ -26,14 +54,23 @@ public partial class LoginWindow : Window
             ServerBox.Text = Config.ServerUrl;
             ApiBox.Text = Config.ApiUrl;
             StatusText.Text = "Настройки сохранены";
+            _ = LoadLoginUsersAsync();
         }
+    }
+
+    private void OnLoginSelected(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (LoginBox.SelectedItem is LoginUserOption)
+            PasswordBox.Focus();
     }
 
     private async void OnLogin(object sender, RoutedEventArgs e)
     {
         var server = ServerBox.Text.Trim().TrimEnd('/');
         var api = ApiBox.Text.Trim().TrimEnd('/');
-        var login = LoginBox.Text.Trim();
+        var login = LoginBox.SelectedItem is LoginUserOption selected
+            ? selected.Login
+            : LoginBox.Text.Trim();
         var password = PasswordBox.Password;
         if (server.Length == 0)
         {
@@ -95,3 +132,5 @@ public partial class LoginWindow : Window
         Close();
     }
 }
+
+public sealed record LoginUserOption(string Login, string DisplayName);

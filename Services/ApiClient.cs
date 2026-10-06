@@ -61,6 +61,12 @@ public sealed class ApiClient : IDisposable
         return session;
     }
 
+    public async Task<List<JsonMap>> GetLoginUsersAsync(CancellationToken ct = default)
+    {
+        var body = await ApiJsonAsync("GET", "/api/v1/login/users", null, 20, ct);
+        return body.Arr("users");
+    }
+
     public async Task LogoutAsync()
     {
         try { await _web.PostAsync(Web("/api/warehouse/logout"), null); } catch { }

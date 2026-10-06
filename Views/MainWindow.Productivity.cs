@@ -18,7 +18,7 @@ public partial class MainWindow
     private void InitializeProductivity()
     {
         ProductivityDays.ItemsSource = _productivityDays;
-        ProductivityMonthPicker.SelectedDate = _productivityMonth;
+        ProductivityMonthText.Text = _productivityMonth.ToString("MMMM yyyy");
     }
 
     private bool HandleProductivityTabChange()
@@ -123,8 +123,6 @@ public partial class MainWindow
 
     private async void OnProductivityReload(object sender, RoutedEventArgs e)
     {
-        if (ProductivityMonthPicker.SelectedDate is DateTime selected)
-            _productivityMonth = new DateTime(selected.Year, selected.Month, 1);
         try
         {
             await LoadProductivityAsync();
@@ -141,14 +139,14 @@ public partial class MainWindow
     private void OnProductivityPreviousMonth(object sender, RoutedEventArgs e)
     {
         _productivityMonth = _productivityMonth.AddMonths(-1);
-        ProductivityMonthPicker.SelectedDate = _productivityMonth;
+        ProductivityMonthText.Text = _productivityMonth.ToString("MMMM yyyy");
         OnProductivityReload(sender, e);
     }
 
     private void OnProductivityNextMonth(object sender, RoutedEventArgs e)
     {
         _productivityMonth = _productivityMonth.AddMonths(1);
-        ProductivityMonthPicker.SelectedDate = _productivityMonth;
+        ProductivityMonthText.Text = _productivityMonth.ToString("MMMM yyyy");
         OnProductivityReload(sender, e);
     }
 }
