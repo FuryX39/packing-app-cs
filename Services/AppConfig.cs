@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace WarehousePacking.Services;
@@ -14,6 +15,7 @@ public sealed class AppConfig
     public string PrintSettingsA4 { get; set; } = "paper=A4,portrait";
     public string PrinterLabel { get; set; } = "";
     public string PrintSettingsLabel { get; set; } = "noscale,portrait,disable-auto-rotation,paper=47mm x 25mm";
+    public string PrintSettingsLabelPresetsJson { get; set; } = "[]";
     public string RefreshSeconds { get; set; } = "30";
     public string FbsSkipMpConfirm { get; set; } = "0";
     public string PeerPrintAcceptRaw { get; set; } = "1";
@@ -98,6 +100,7 @@ public sealed class AppConfig
                 case "BARCODE_PRINT_SETTINGS_A4": cfg.PrintSettingsA4 = value; break;
                 case "BARCODE_PRINT_PRINTER_LABEL": cfg.PrinterLabel = value; break;
                 case "BARCODE_PRINT_SETTINGS_LABEL": cfg.PrintSettingsLabel = value; break;
+                case "BARCODE_PRINT_SETTINGS_LABEL_PRESETS": cfg.PrintSettingsLabelPresetsJson = value; break;
                 case "REFRESH_SECONDS": cfg.RefreshSeconds = value; break;
                 case "FBS_SKIP_MP_CONFIRM": cfg.FbsSkipMpConfirm = value; break;
                 case "PEER_PRINT_ACCEPT": cfg.PeerPrintAcceptRaw = value; break;
@@ -127,6 +130,7 @@ public sealed class AppConfig
             $"BARCODE_PRINT_SETTINGS_A4={Quote(PrintSettingsA4)}",
             $"BARCODE_PRINT_PRINTER_LABEL={Quote(LabelPrinter)}",
             $"BARCODE_PRINT_SETTINGS_LABEL={Quote(LabelSettings)}",
+            $"BARCODE_PRINT_SETTINGS_LABEL_PRESETS={Quote(PrintSettingsLabelPresetsJson)}",
             $"REFRESH_SECONDS={Quote(RefreshSeconds)}",
             $"FBS_SKIP_MP_CONFIRM={Quote(FbsSkipMpConfirm)}",
             $"PEER_PRINT_ACCEPT={Quote(PeerPrintAcceptRaw)}",
@@ -137,6 +141,32 @@ public sealed class AppConfig
 
     public PrintProfile LabelProfile() => new(LabelPrinter, LabelSettings);
     public PrintProfile A4Profile() => new(PrinterA4, string.IsNullOrWhiteSpace(PrintSettingsA4) ? "paper=A4,portrait" : PrintSettingsA4);
+
+    public List<string> LabelSettingsPresets()
+    {
+        try
+        {
+            return (JsonSerializer.Deserialize<List<string>>(PrintSettingsLabelPresetsJson) ?? [])
+                .Select(value => value.Trim())
+                .Where(value => value.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    public void SetLabelSettingsPresets(IEnumerable<string> presets)
+    {
+        var values = presets
+            .Select(value => value.Trim())
+            .Where(value => value.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        PrintSettingsLabelPresetsJson = JsonSerializer.Serialize(values);
+    }
 
     private static IEnumerable<string> CandidateDirs()
     {

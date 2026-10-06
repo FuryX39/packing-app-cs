@@ -7,6 +7,7 @@ public partial class SettingsWindow : Window
 {
     private readonly AppConfig _config;
     private readonly ApiClient? _client;
+    private readonly List<string> _labelSettingsPresets;
     public Action? CacheHintChanged { get; set; }
 
     public SettingsWindow(AppConfig config, ApiClient? client)
@@ -23,11 +24,43 @@ public partial class SettingsWindow : Window
         PrinterA4Box.Text = config.PrinterA4;
         SettingsA4Box.Text = config.PrintSettingsA4;
         PrinterLabelBox.Text = config.LabelPrinter;
-        SettingsLabelBox.Text = config.LabelSettings;
+        _labelSettingsPresets = config.LabelSettingsPresets();
+        RefreshLabelPresetList(config.LabelSettings);
         RefreshBox.Text = config.RefreshSeconds;
         PeerAcceptBox.IsChecked = config.PeerPrintAccept;
         RefreshCacheSummary();
         Loaded += async (_, _) => await ReloadPrintersAsync();
+    }
+
+    private void RefreshLabelPresetList(string current)
+    {
+        SettingsLabelBox.ItemsSource = null;
+        SettingsLabelBox.ItemsSource = _labelSettingsPresets.ToList();
+        SettingsLabelBox.Text = current;
+    }
+
+    private void OnSaveLabelPreset(object sender, RoutedEventArgs e)
+    {
+        var settings = SettingsLabelBox.Text.Trim();
+        if (settings.Length == 0)
+        {
+            MessageBox.Show(this, "Введите параметры печати.", "Пресеты",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        if (!_labelSettingsPresets.Contains(settings, StringComparer.OrdinalIgnoreCase))
+            _labelSettingsPresets.Add(settings);
+        _config.SetLabelSettingsPresets(_labelSettingsPresets);
+        try
+        {
+            _config.Save();
+            RefreshLabelPresetList(settings);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Ошибка сохранения",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private async void OnRefreshPeers(object sender, RoutedEventArgs e)

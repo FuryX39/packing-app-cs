@@ -35,7 +35,16 @@
                     <TextBlock Grid.Row="4" Text="Принтер этикеток" VerticalAlignment="Center" Margin="0,5,8,5"/>
                     <ComboBox x:Name="PrinterLabelBox" Grid.Row="4" Grid.Column="1" Margin="0,5" IsEditable="True"/>
                     <TextBlock Grid.Row="5" Text="Параметры этикеток" VerticalAlignment="Center" Margin="0,5,8,5"/>
-                    <TextBox x:Name="SettingsLabelBox" Grid.Row="5" Grid.Column="1" Margin="0,5"/>
+                    <Grid Grid.Row="5" Grid.Column="1" Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ComboBox x:Name="SettingsLabelBox" IsEditable="True"/>
+                        <Button x:Name="SaveLabelPresetButton" Grid.Column="1"
+                                Content="Сохранить пресет" Margin="8,0,0,0"
+                                Click="OnSaveLabelPreset"/>
+                    </Grid>
                     <TextBlock Grid.Row="6" Text="Автообновление, сек" VerticalAlignment="Center" Margin="0,5,8,5"/>
                     <TextBox x:Name="RefreshBox" Grid.Row="6" Grid.Column="1" Margin="0,5"/>
                 </Grid>
