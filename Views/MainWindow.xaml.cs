@@ -106,11 +106,14 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _fboNewOpenCts;
     private readonly DispatcherTimer _fboNewSelectTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
 
-    public MainWindow(AppConfig config, ApiClient client, string userName)
+    private readonly int _userId;
+
+    public MainWindow(AppConfig config, ApiClient client, string userName, int userId = 0)
     {
         InitializeComponent();
         _config = config;
         _client = client;
+        _userId = userId;
         _photos = new PhotoLoader(Dispatcher);
         ScanSounds.Init();
         Title = $"Warehouse Packing — {userName}";

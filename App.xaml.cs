@@ -31,7 +31,7 @@ public partial class App : Application
         var login = new LoginWindow();
         if (login.ShowDialog() == true && login.Client is { } client)
         {
-            var main = new MainWindow(login.Config, client, login.UserName);
+            var main = new MainWindow(login.Config, client, login.UserName, login.UserId);
             MainWindow = main;
             main.Show();
             ShutdownMode = ShutdownMode.OnMainWindowClose;

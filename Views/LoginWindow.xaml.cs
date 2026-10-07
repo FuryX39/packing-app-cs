@@ -8,6 +8,7 @@ public partial class LoginWindow : Window
     public AppConfig Config { get; private set; } = AppConfig.Load();
     public ApiClient? Client { get; private set; }
     public string UserName { get; private set; } = "";
+    public int UserId { get; private set; }
 
     public LoginWindow()
     {
@@ -106,6 +107,7 @@ public partial class LoginWindow : Window
             }
             var user = session.Obj("user");
             UserName = user?.Str("display_name", user.Str("login", login)) ?? login;
+            UserId = user?.Int("id") ?? 0;
             Client = client;
             DialogResult = true;
             Close();

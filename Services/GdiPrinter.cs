@@ -25,9 +25,13 @@ public static class GdiPrinter
         return names;
     }
 
-    public static void PrintPdf(byte[] pdfBytes, PrintProfile profile, int copies = 1)
+    public static void PrintPdf(
+        byte[] pdfBytes,
+        PrintProfile profile,
+        int copies = 1,
+        bool rotatePortrait = false)
     {
-        PrintPdfs([pdfBytes], profile, copies);
+        PrintPdfs([pdfBytes], profile, copies, rotatePortrait);
     }
 
     public static void PrintPdfsIsolated(
@@ -127,7 +131,11 @@ public static class GdiPrinter
         }
     }
 
-    public static void PrintPdfs(IEnumerable<byte[]> pdfs, PrintProfile profile, int copies = 1)
+    public static void PrintPdfs(
+        IEnumerable<byte[]> pdfs,
+        PrintProfile profile,
+        int copies = 1,
+        bool rotatePortrait = false)
     {
         if (PeerPrint.IsRemote(profile.Printer))
         {
@@ -149,7 +157,7 @@ public static class GdiPrinter
             {
                 if (pdf is null || pdf.Length == 0)
                     continue;
-                pages.AddRange(Rasterize(pdf, dpi));
+                pages.AddRange(Rasterize(pdf, dpi, rotatePortrait));
             }
             if (pages.Count == 0)
                 throw new InvalidOperationException("Пустой PDF");
@@ -171,7 +179,10 @@ public static class GdiPrinter
             PrintPages(pages, profile.Printer, Math.Clamp(copies, 1, 9999), options);
     }
 
-    private static List<(Bitmap Bitmap, (double W, double H) Pts)> Rasterize(byte[] pdf, int dpi)
+    private static List<(Bitmap Bitmap, (double W, double H) Pts)> Rasterize(
+        byte[] pdf,
+        int dpi,
+        bool rotatePortrait = false)
     {
         using var stream = new MemoryStream(pdf, writable: false);
         var pages = new List<(Bitmap, (double, double))>();
@@ -180,6 +191,8 @@ public static class GdiPrinter
             using (sk)
             {
                 var bmp = ToBitmap(sk);
+                if (rotatePortrait && bmp.Height > bmp.Width)
+                    bmp.RotateFlip(RotateFlipType.Rotate90FlipNone);
                 pages.Add((bmp, (bmp.Width * 72.0 / dpi, bmp.Height * 72.0 / dpi)));
             }
         }

@@ -898,7 +898,14 @@
                                                 <ItemsControl ItemsSource="{Binding Tasks}" Margin="36,0,14,12">
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate>
-                                                            <Grid Margin="0,5">
+                                                            <Grid Margin="0,5" Background="Transparent"
+                                                                  ContextMenuOpening="OnProductivityTaskContextOpening">
+                                                                <Grid.ContextMenu>
+                                                                    <ContextMenu>
+                                                                        <MenuItem Header="Упаковщики…"
+                                                                                  Click="OnProductivityTaskPackers"/>
+                                                                    </ContextMenu>
+                                                                </Grid.ContextMenu>
                                                                 <Grid.ColumnDefinitions>
                                                                     <ColumnDefinition Width="130"/>
                                                                     <ColumnDefinition Width="*"/>

@@ -70,6 +70,22 @@ public sealed class JsonMap
         return p is { ValueKind: JsonValueKind.Object } ? new JsonMap(p.Value) : null;
     }
 
+    public List<int> IntArr(string name)
+    {
+        var p = Prop(name);
+        if (p is null || p.Value.ValueKind != JsonValueKind.Array)
+            return [];
+        var list = new List<int>();
+        foreach (var item in p.Value.EnumerateArray())
+        {
+            if (item.ValueKind == JsonValueKind.Number && item.TryGetInt32(out var n))
+                list.Add(n);
+            else if (int.TryParse(item.ToString(), out var parsed))
+                list.Add(parsed);
+        }
+        return list;
+    }
+
     public List<JsonMap> Arr(string name)
     {
         var p = Prop(name);

@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Windows;
+using System.Windows.Controls;
 using WarehousePacking.Services;
 
 namespace WarehousePacking.Views;
@@ -84,10 +85,16 @@ public partial class MainWindow
         {
             var tasks = day.Arr("tasks")
                 .Select(task => new ProductivityTaskRow(
+                    day.Str("date"),
+                    task.Str("task_type"),
+                    task.Int("task_id"),
                     task.Str("task_type_name"),
                     task.Str("task_data"),
                     task.Int("quantity"),
-                    task.Str("pay")))
+                    task.Str("pay"),
+                    task.Flag("has_own_work") || !task.Has("has_own_work"),
+                    task.IntArr("packer_user_ids"),
+                    task.Str("shared_from")))
                 .ToList();
             _productivityDays.Add(new ProductivityDayRow(
                 day.Str("display_date"),
@@ -126,6 +133,60 @@ public partial class MainWindow
         _productivityTabTransition = false;
     }
 
+    private void OnProductivityTaskContextOpening(object sender, ContextMenuEventArgs e)
+    {
+        if (sender is not FrameworkElement element ||
+            element.DataContext is not ProductivityTaskRow row)
+        {
+            e.Handled = true;
+            return;
+        }
+        if (!row.HasOwnWork)
+            e.Handled = true;
+    }
+
+    private async void OnProductivityTaskPackers(object sender, RoutedEventArgs e)
+    {
+        var menu = (sender as MenuItem)?.Parent as ContextMenu;
+        var row = (menu?.PlacementTarget as FrameworkElement)?.DataContext as ProductivityTaskRow;
+        if (row is null || !row.HasOwnWork)
+            return;
+        try
+        {
+            var employees = await _client.GetProductivityEmployeesAsync();
+            var selected = new HashSet<int>(row.PackerUserIds);
+            var choices = employees
+                .Select(item => new PackerChoice
+                {
+                    Id = item.Int("id"),
+                    Name = item.Str("display_name", item.Str("login", "Сотрудник")),
+                    IsChecked = selected.Contains(item.Int("id")),
+                })
+                .Where(item => item.Id > 0 && item.Id != _userId)
+                .ToList();
+            var dialog = new ProductivityPackersWindow(
+                $"{row.TaskType} · {row.TaskData}",
+                choices)
+            {
+                Owner = this,
+            };
+            if (dialog.ShowDialog() != true)
+                return;
+            await _client.SetProductivityPackersAsync(
+                _productivityPassword,
+                row.Date,
+                row.TaskTypeId,
+                row.TaskId,
+                dialog.SelectedIds);
+            await LoadProductivityAsync();
+        }
+        catch (Exception exc)
+        {
+            MessageBox.Show(this, exc.Message, "Упаковщики",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
     private async void OnProductivityReload(object sender, RoutedEventArgs e)
     {
         try
@@ -157,10 +218,16 @@ public partial class MainWindow
 }
 
 public sealed record ProductivityTaskRow(
+    string Date,
+    string TaskTypeId,
+    int TaskId,
     string TaskType,
     string TaskData,
     int Quantity,
-    string PayText)
+    string PayText,
+    bool HasOwnWork,
+    IReadOnlyList<int> PackerUserIds,
+    string SharedFrom)
 {
     public string QuantityText =>
         string.IsNullOrWhiteSpace(PayText) ? $"{Quantity} шт." : $"{Quantity} шт.  {PayText} ₽";

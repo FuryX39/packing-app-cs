@@ -122,6 +122,33 @@ public sealed class ApiClient : IDisposable
             30,
             ct);
 
+    public async Task<List<JsonMap>> GetProductivityEmployeesAsync(CancellationToken ct = default)
+    {
+        var body = await ApiJsonAsync("GET", "/api/v1/productivity/employees", null, 20, ct);
+        return body.Arr("employees");
+    }
+
+    public Task<JsonMap> SetProductivityPackersAsync(
+        string password,
+        string date,
+        string taskType,
+        int taskId,
+        IReadOnlyList<int> userIds,
+        CancellationToken ct = default) =>
+        ApiJsonAsync(
+            "PUT",
+            "/api/v1/productivity/packers",
+            new
+            {
+                password,
+                date,
+                task_type = taskType,
+                task_id = taskId,
+                user_ids = userIds,
+            },
+            30,
+            ct);
+
     public async Task<JsonMap> PatchTaskAsync(int taskId, object body, CancellationToken ct = default)
     {
         var json = await WebJsonAsync("PATCH", $"/api/warehouse/tasks/{taskId}", body, 30, ct);
