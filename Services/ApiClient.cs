@@ -372,28 +372,8 @@ public sealed class ApiClient : IDisposable
     public Task<JsonMap> FboSheetReprintBoxAsync(int jobId, int boxId, CancellationToken ct = default) =>
         ApiJsonAsync("POST", $"/api/v1/fbo-sheet-packing/jobs/{jobId}/reprint-box", new { box_id = boxId }, 60, ct);
 
-    public Task<JsonMap> FboSheetPrintPalletsAsync(int jobId, int count, CancellationToken ct = default) =>
-        ApiJsonAsync("POST", $"/api/v1/fbo-sheet-packing/jobs/{jobId}/print-pallets", new { count }, 60, ct);
-
-    public Task<JsonMap> FboSheetReprintPalletAsync(int jobId, int palletId, CancellationToken ct = default) =>
-        ApiJsonAsync("POST", $"/api/v1/fbo-sheet-packing/jobs/{jobId}/reprint-pallet", new { pallet_id = palletId }, 60, ct);
-
     public Task<byte[]> FboSheetDownloadSupplyQrAsync(int jobId, CancellationToken ct = default) =>
         ApiBytesAsync($"/api/v1/fbo-sheet-packing/jobs/{jobId}/supply-qr.pdf", 60, ct);
-
-    public Task<byte[]> FboSheetPalletSheetsAsync(
-        int jobId,
-        int? printCount,
-        int? palletTotal,
-        CancellationToken ct = default) =>
-        ApiPostBytesAsync(
-            $"/api/v1/fbo-sheet-packing/jobs/{jobId}/pallet-sheets.pdf",
-            new { print_count = printCount, pallet_total = palletTotal },
-            120,
-            ct);
-
-    public Task<JsonMap> FboSheetClosePalletAsync(int jobId, string barcode, CancellationToken ct = default) =>
-        ApiJsonAsync("POST", $"/api/v1/fbo-sheet-packing/jobs/{jobId}/close-pallet", new { barcode }, 30, ct);
 
     public Task<JsonMap> FboSheetResolveAsync(int jobId, string barcode, CancellationToken ct = default) =>
         ApiJsonAsync("POST", $"/api/v1/fbo-sheet-packing/jobs/{jobId}/resolve", new { barcode }, 30, ct);
@@ -426,15 +406,6 @@ public sealed class ApiClient : IDisposable
         {
             box_id = boxId,
             product_barcode = productBarcode ?? "",
-        }, 30, ct);
-
-    public Task<JsonMap> FboSheetUnbindPalletAsync(
-        int jobId,
-        int boxId,
-        CancellationToken ct = default) =>
-        ApiJsonAsync("POST", $"/api/v1/fbo-sheet-packing/jobs/{jobId}/unbind-pallet", new
-        {
-            box_id = boxId,
         }, 30, ct);
 
     public void Dispose()

@@ -113,11 +113,9 @@ public partial class MainWindow
         try
         {
             _fboNewQtyWarning = "";
-            _fboNewClosingPallet = false;
             if (_fboNewJob?.IntOrNull("id") != jobId)
             {
                 _fboNewLastPrintedBoxId = 0;
-                _fboNewLastPrintedPalletId = 0;
                 ClearFboNewProduct();
             }
             ApplyFboNewQtyWarning();
@@ -152,9 +150,8 @@ public partial class MainWindow
         var total = job?.Int("box_total") ?? 0;
         var printed = job?.Int("box_printed") ?? 0;
         var pending = job?.Int("box_pending") ?? 0;
-        var pallets = job is null ? "" : $" · паллеты {job.Int("pallet_closed")}/{job.Int("pallet_total")}";
         var pcs = job is null ? "" : $" · шт. {job.Int("pcs_assigned")}/{job.Int("pcs_plan")}";
-        FboNewJobStats.Text = $"грузоместа {assigned}/{total} · напечатано {printed} · не печатались {pending}{pallets}{pcs}";
+        FboNewJobStats.Text = $"грузоместа {assigned}/{total} · напечатано {printed} · не печатались {pending}{pcs}";
         RefreshFboNewSelectedText();
         RenderFboNewRemaining();
         RenderFboNewOverview();
@@ -186,11 +183,6 @@ public partial class MainWindow
         if (FindParent<DataGridRow>(e.OriginalSource as DependencyObject) is null)
             return;
         if (FboNewRemainingGrid.SelectedItem is not RemainingRow row) return;
-        if (_fboNewJob?.Obj("open_pallet") is null)
-        {
-            MessageBox.Show(this, "Сначала пикните паллет", "FBO WB new");
-            return;
-        }
         var groups = _fboNewJob?.Arr("remaining_groups") ?? [];
         if (row.Index < 0 || row.Index >= groups.Count) return;
         ApplyFboNewProduct(groups[row.Index], null);
@@ -204,38 +196,8 @@ public partial class MainWindow
         FocusFboNewScan();
     }
 
-    private void RefreshFboNewPalletText()
-    {
-        var open = _fboNewJob?.Obj("open_pallet");
-        if (_fboNewClosingPallet && open is not null)
-        {
-            FboNewPalletText.Text = $"Закрытие паллета {open.Str("pallet_id")} — пикните его ШК";
-            FboNewClosePalletBtn.Content = "Отмена";
-            return;
-        }
-        FboNewClosePalletBtn.Content = "Закрыть паллет";
-        if (open is null)
-        {
-            FboNewPalletText.Text = "Сначала пикните паллет";
-            return;
-        }
-        var boxes = open.Int("box_count");
-        FboNewPalletText.Text = $"Паллет {open.Str("pallet_id")} · грузомест {boxes}. Повторный пик закрывает паллет.";
-    }
-
     private void RefreshFboNewSelectedText()
     {
-        RefreshFboNewPalletText();
-        if (_fboNewClosingPallet)
-        {
-            FboNewSelectedText.Text = "Пикните ШК открытого паллета, чтобы закрыть его";
-            return;
-        }
-        if (_fboNewJob?.Obj("open_pallet") is null)
-        {
-            FboNewSelectedText.Text = "Пикните паллет";
-            return;
-        }
         if (_fboNewProduct is null)
         {
             FboNewSelectedText.Text = "Пикните товар, затем грузоместо";
@@ -505,58 +467,6 @@ public partial class MainWindow
         }, "Перепечатка...");
     }
 
-    private async void OnFboNewPrintPallets(object sender, RoutedEventArgs e)
-    {
-        if (_fboNewJob is null)
-        {
-            MessageBox.Show(this, "Сначала откройте задание", "FBO WB new");
-            return;
-        }
-        if (!int.TryParse((FboNewPalletPrintCount.Text ?? "").Trim(), out var count) || count <= 0)
-        {
-            MessageBox.Show(this, "Укажите, сколько ШК паллет напечатать", "FBO WB new");
-            return;
-        }
-        var jobId = _fboNewJob.Int("id");
-        await FboNewRunAsync(async () =>
-        {
-            var payload = await _client.FboSheetPrintPalletsAsync(jobId, count);
-            _fboNewJob = payload.Obj("job") ?? _fboNewJob;
-            var pallets = payload.Arr("pallets");
-            if (pallets.Count > 0)
-                _fboNewLastPrintedPalletId = pallets[^1].Int("id");
-            var pdfs = DecodeFboNewPdfs(payload);
-            if (pdfs.Count > 0)
-                await Task.Run(() => GdiPrinter.PrintPdfs(pdfs, _config.LabelProfile()));
-            RenderFboNewJob();
-            RenderFboNewJobs();
-            SetStatus($"Напечатано ШК паллет: {pdfs.Count}");
-            FocusFboNewScan();
-        }, "Печать ШК паллет...");
-    }
-
-    private async void OnFboNewReprintLastPallet(object sender, RoutedEventArgs e)
-    {
-        if (_fboNewJob is null || _fboNewLastPrintedPalletId <= 0)
-        {
-            MessageBox.Show(this, "Нет последнего напечатанного ШК паллета", "FBO WB new");
-            return;
-        }
-        var jobId = _fboNewJob.Int("id");
-        var palletId = _fboNewLastPrintedPalletId;
-        await FboNewRunAsync(async () =>
-        {
-            var payload = await _client.FboSheetReprintPalletAsync(jobId, palletId);
-            _fboNewJob = payload.Obj("job") ?? _fboNewJob;
-            var pdfs = DecodeFboNewPdfs(payload);
-            if (pdfs.Count > 0)
-                await Task.Run(() => GdiPrinter.PrintPdfs(pdfs, _config.LabelProfile()));
-            RenderFboNewJob();
-            SetStatus("Ярлык паллета перепечатан");
-            FocusFboNewScan();
-        }, "Перепечатка паллета...");
-    }
-
     private async void OnFboNewPrintSupplyQr(object sender, RoutedEventArgs e)
     {
         if (_fboNewJob is null)
@@ -574,26 +484,6 @@ public partial class MainWindow
             SetStatus($"QR поставки отправлен на печать: {copies.Value} шт.");
             FocusFboNewScan();
         }, "Печать QR поставки...");
-    }
-
-    private async void OnFboNewPrintPalletSheets(object sender, RoutedEventArgs e)
-    {
-        if (_fboNewJob is null)
-        {
-            MessageBox.Show(this, "Сначала откройте задание", "FBO WB new");
-            return;
-        }
-        var options = ShowFboNewPalletSheetsDialog();
-        if (options is null) return;
-        var (printCount, palletTotal) = options.Value;
-        var jobId = _fboNewJob.Int("id");
-        await FboNewRunAsync(async () =>
-        {
-            var pdf = await _client.FboSheetPalletSheetsAsync(jobId, printCount, palletTotal);
-            await Task.Run(() => GdiPrinter.PrintPdf(pdf, _config.A4Profile()));
-            SetStatus("Упаковочные листы отправлены на печать");
-            FocusFboNewScan();
-        }, "Печать упаковочных листов...");
     }
 
     private int? ShowFboNewSupplyQrDialog()
@@ -637,80 +527,6 @@ public partial class MainWindow
         return dialog.ShowDialog() == true ? result : null;
     }
 
-    private (int? PrintCount, int? PalletTotal)? ShowFboNewPalletSheetsDialog()
-    {
-        var dialog = CreateFboNewPrintDialog("Печать упаковочных листов", 430);
-        var panel = new StackPanel { Margin = new Thickness(16) };
-        panel.Children.Add(new TextBlock
-        {
-            Text = "Количество для печати",
-            Margin = new Thickness(0, 0, 0, 5),
-        });
-        var printCountBox = new TextBox
-        {
-            FontSize = 16,
-            Margin = new Thickness(0, 0, 0, 12),
-        };
-        panel.Children.Add(printCountBox);
-        panel.Children.Add(new TextBlock
-        {
-            Text = "Общее количество паллет",
-            Margin = new Thickness(0, 0, 0, 5),
-        });
-        var palletTotalBox = new TextBox
-        {
-            FontSize = 16,
-            Margin = new Thickness(0, 0, 0, 8),
-        };
-        panel.Children.Add(palletTotalBox);
-
-        var occupiedPallets = _fboNewJob?.Int("occupied_pallet_count") ?? 0;
-        panel.Children.Add(new TextBlock
-        {
-            Text = occupiedPallets > 0
-                ? $"Если поля пустые, будут напечатаны листы для {occupiedPallets} занятых паллет."
-                : "Если поля пустые, будут напечатаны листы для всех занятых паллет.",
-            Foreground = Brushes.DimGray,
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 14),
-        });
-
-        (int? PrintCount, int? PalletTotal)? result = null;
-        panel.Children.Add(CreateFboNewDialogButtons(
-            dialog,
-            () =>
-            {
-                if (!TryOptionalFboNewCount(
-                        printCountBox.Text,
-                        "Количество для печати",
-                        dialog,
-                        printCountBox,
-                        out var printCount) ||
-                    !TryOptionalFboNewCount(
-                        palletTotalBox.Text,
-                        "Общее количество паллет",
-                        dialog,
-                        palletTotalBox,
-                        out var palletTotal))
-                    return;
-                if (printCount is int count && palletTotal is int total && count > total)
-                {
-                    MessageBox.Show(
-                        dialog,
-                        "Количество для печати не может быть больше общего количества паллет",
-                        "FBO WB new");
-                    printCountBox.Focus();
-                    printCountBox.SelectAll();
-                    return;
-                }
-                result = (printCount, palletTotal);
-                dialog.DialogResult = true;
-            }));
-        dialog.Content = panel;
-        dialog.Loaded += (_, _) => printCountBox.Focus();
-        return dialog.ShowDialog() == true ? result : null;
-    }
-
     private Window CreateFboNewPrintDialog(string title, double width) => new()
     {
         Title = title,
@@ -751,46 +567,6 @@ public partial class MainWindow
         return buttons;
     }
 
-    private bool TryOptionalFboNewCount(string? raw, string label, out int? value)
-        => TryOptionalFboNewCount(raw, label, this, null, out value);
-
-    private static bool TryOptionalFboNewCount(
-        string? raw,
-        string label,
-        Window owner,
-        TextBox? input,
-        out int? value)
-    {
-        var text = (raw ?? "").Trim();
-        if (text.Length == 0)
-        {
-            value = null;
-            return true;
-        }
-        if (!int.TryParse(text, out var parsed) || parsed < 1 || parsed > 200)
-        {
-            MessageBox.Show(owner, $"{label}: укажите число от 1 до 200", "FBO WB new");
-            input?.Focus();
-            input?.SelectAll();
-            value = null;
-            return false;
-        }
-        value = parsed;
-        return true;
-    }
-
-    private void OnFboNewClosePallet(object sender, RoutedEventArgs e)
-    {
-        if (_fboNewJob?.Obj("open_pallet") is null)
-        {
-            MessageBox.Show(this, "Сначала пикните паллет", "FBO WB new");
-            return;
-        }
-        _fboNewClosingPallet = !_fboNewClosingPallet;
-        RefreshFboNewSelectedText();
-        FocusFboNewScan();
-    }
-
     private static List<byte[]> DecodeFboNewPdfs(JsonMap payload)
     {
         var encoded = payload.StrList("pdfs_base64");
@@ -821,47 +597,10 @@ public partial class MainWindow
         var jobId = _fboNewJob.Int("id");
         await FboNewRunAsync(async () =>
         {
-            if (_fboNewClosingPallet)
-            {
-                var closed = await _client.FboSheetClosePalletAsync(jobId, code);
-                _fboNewJob = closed.Obj("job") ?? await _client.FboSheetOpenJobAsync(jobId);
-                _fboNewClosingPallet = false;
-                RenderFboNewJob();
-                RenderFboNewJobs();
-                SetStatus($"Паллет {closed.Obj("pallet")?.Str("pallet_id") ?? ""} закрыт");
-                ScanSounds.Ok();
-                FocusFboNewScan();
-                return;
-            }
             var resolved = await _client.FboSheetResolveAsync(jobId, code);
             var kind = resolved.Str("kind");
-            if (kind == "pallet")
-            {
-                _fboNewClosingPallet = false;
-                _fboNewJob = resolved.Obj("job") ?? await _client.FboSheetOpenJobAsync(jobId);
-                RenderFboNewJob();
-                var palletId = resolved.Obj("pallet")?.Str("pallet_id") ?? "";
-                var action = resolved.Str("action");
-                if (action == "closed")
-                    SetStatus($"Паллет {palletId} закрыт");
-                else if (action == "reopened")
-                {
-                    var warning = resolved.Str("warning");
-                    if (warning.Length == 0)
-                        warning = "Этот паллет открыт повторно";
-                    MessageBox.Show(this, warning, "FBO WB new", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    SetStatus($"Паллет {palletId} открыт повторно");
-                }
-                else
-                    SetStatus($"Паллет {palletId}");
-                ScanSounds.Ok();
-                FocusFboNewScan();
-                return;
-            }
             if (kind == "product")
             {
-                if (_fboNewJob?.Obj("open_pallet") is null)
-                    throw new ApiException("Сначала пикните паллет");
                 var product = resolved.Obj("product");
                 if (product is null)
                     throw new ApiException("Товар не распознан");
@@ -872,8 +611,6 @@ public partial class MainWindow
             }
             if (kind == "wb_box")
             {
-                if (_fboNewJob?.Obj("open_pallet") is null)
-                    throw new ApiException("Сначала пикните паллет");
                 if (_fboNewProduct is null)
                     throw new ApiException("Сначала пикните товар, затем грузоместо");
                 var qty = ReadFboNewQty();
@@ -971,21 +708,10 @@ public partial class MainWindow
             return;
         menu.Tag = data;
         var unassign = CanUnassignOverview(data);
-        var unbindPallet = CanUnbindPalletOverview(data);
-        if (!unassign && !unbindPallet)
+        if (!unassign)
         {
             e.Handled = true;
             return;
-        }
-        foreach (var item in menu.Items.OfType<MenuItem>())
-        {
-            var tag = item.Tag as string;
-            item.Visibility = tag switch
-            {
-                "unassign" => unassign ? Visibility.Visible : Visibility.Collapsed,
-                "pallet" => unbindPallet ? Visibility.Visible : Visibility.Collapsed,
-                _ => Visibility.Visible,
-            };
         }
     }
 
@@ -1017,10 +743,6 @@ public partial class MainWindow
     private static bool CanUnassignOverview(object? data) =>
         (data is FboOverviewLineRow line && line.CanUnassign)
         || (data is FboOverviewGroupRow group && group.CanUnassign);
-
-    private static bool CanUnbindPalletOverview(object? data) =>
-        (data is FboOverviewLineRow line && line.CanUnbindPallet)
-        || (data is FboOverviewGroupRow group && group.CanUnbindPallet);
 
     private static bool TryOverviewBox(object? data, out int boxId, out string boxCode, out string productBarcode, out string palletCode)
     {
@@ -1083,31 +805,6 @@ public partial class MainWindow
             SetStatus($"Снята привязка с грузоместа {boxCode}");
             FocusFboNewScan();
         }, "Снятие привязки...");
-    }
-
-    private async void OnFboNewUnbindPalletClick(object sender, RoutedEventArgs e)
-    {
-        var data = OverviewMenuData(sender);
-        if (!TryOverviewBox(data, out var boxId, out var boxCode, out _, out var palletCode) ||
-            !CanUnbindPalletOverview(data))
-            return;
-        if (_fboNewJob is null)
-            return;
-        var jobId = _fboNewJob.Int("id");
-        var confirm = palletCode.Length > 0
-            ? $"Снять привязку грузоместа {boxCode} к паллету {palletCode}?"
-            : $"Снять привязку грузоместа {boxCode} к паллету?";
-        if (MessageBox.Show(this, confirm, "FBO WB new", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
-            return;
-        await FboNewRunAsync(async () =>
-        {
-            var payload = await _client.FboSheetUnbindPalletAsync(jobId, boxId);
-            _fboNewJob = payload.Obj("job") ?? _fboNewJob;
-            RenderFboNewJob();
-            RenderFboNewJobs();
-            SetStatus($"Снята привязка грузоместа {boxCode} к паллету");
-            FocusFboNewScan();
-        }, "Снятие привязки к паллету...");
     }
 
     private void SyncFboNewSelectedProduct()
@@ -1184,70 +881,17 @@ public partial class MainWindow
                 EmptyText = "Пусто",
                 BoxId = box.Int("id"),
                 BoxCode = box.Str("box_id"),
-                PalletCode = box.Str("pallet_human_id"),
                 CanUnassign = BoxHasItems(box),
-                CanUnbindPallet = BoxHasPallet(box),
-            });
-        }
-
-        _fboNewByPalletRows.Clear();
-        foreach (var pallet in job.Arr("pallets"))
-        {
-            var palletId = pallet.Int("id");
-            var human = pallet.Str("pallet_id");
-            var lines = new List<FboOverviewLineRow>();
-            foreach (var box in boxes)
-            {
-                var onPallet = box.Int("pallet_id") == palletId ||
-                    (human.Length > 0 && box.Str("pallet_human_id").Equals(human, StringComparison.OrdinalIgnoreCase));
-                if (!onPallet) continue;
-                var productLines = CargoProductLines(box);
-                if (productLines.Count == 0)
-                    lines.Add(OverviewLine(BoxTitle(box, includePallet: false), box, "", canUnassign: false));
-                else
-                    foreach (var line in productLines)
-                    {
-                        lines.Add(OverviewLine(
-                            $"{BoxTitle(box, includePallet: false)} · {line.Text}",
-                            box,
-                            line.ProductBarcode,
-                            canUnassign: line.CanUnassign));
-                    }
-            }
-            _fboNewByPalletRows.Add(new FboOverviewGroupRow
-            {
-                Title = PalletTitle(pallet),
-                Lines = lines,
-                EmptyText = "Нет грузомест",
             });
         }
     }
 
-    private static string PalletTitle(JsonMap pallet)
-    {
-        var id = pallet.Str("pallet_id");
-        if (id.Length == 0) id = $"№{pallet.Int("seq")}";
-        var status = PalletStatusRu(pallet.Str("status"));
-        var boxes = pallet.Int("box_count");
-        return $"{id} · {status} · грузомест {boxes}";
-    }
-
-    private static string PalletStatusRu(string status) => status switch
-    {
-        "open" => "открыт",
-        "closed" => "закрыт",
-        "printed" => "напечатан",
-        _ => status,
-    };
-
-    private static string BoxTitle(JsonMap box, bool includePallet = true)
+    private static string BoxTitle(JsonMap box)
     {
         var id = box.Str("box_id");
         if (id.Length == 0) id = box.Str("order_display");
         if (id.Length == 0) id = $"№{box.Int("seq")}";
-        if (!includePallet) return id;
-        var pallet = box.Str("pallet_human_id");
-        return pallet.Length > 0 ? $"{id} · {pallet}" : id;
+        return id;
     }
 
     private static bool BoxHasItems(JsonMap box)
@@ -1275,9 +919,6 @@ public partial class MainWindow
         }
     }
 
-    private static bool BoxHasPallet(JsonMap box) =>
-        box.Int("pallet_id") > 0 || box.Str("pallet_human_id").Length > 0;
-
     private static FboOverviewLineRow OverviewLine(string text, JsonMap box, string productBarcode, bool canUnassign)
     {
         return new FboOverviewLineRow
@@ -1286,9 +927,7 @@ public partial class MainWindow
             BoxId = box.Int("id"),
             BoxCode = box.Str("box_id"),
             ProductBarcode = productBarcode,
-            PalletCode = box.Str("pallet_human_id"),
             CanUnassign = canUnassign && box.Int("id") > 0,
-            CanUnbindPallet = BoxHasPallet(box) && box.Int("id") > 0,
         };
     }
 

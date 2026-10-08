@@ -92,8 +92,6 @@ public partial class MainWindow : Window
     private int _fboNewJobsPage;
     private int _fboNewPendingJobId;
     private int _fboNewLastPrintedBoxId;
-    private int _fboNewLastPrintedPalletId;
-    private bool _fboNewClosingPallet;
     private string _fboNewQtyWarning = "";
     private readonly Dictionary<string, int> _fboNewRememberedQty = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, DateTime> _fboNewProductionDates = new(StringComparer.OrdinalIgnoreCase);
@@ -101,7 +99,6 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<RemainingRow> _fboNewRemainingRows = [];
     private readonly ObservableCollection<FboOverviewGroupRow> _fboNewByProductRows = [];
     private readonly ObservableCollection<FboOverviewGroupRow> _fboNewByCargoRows = [];
-    private readonly ObservableCollection<FboOverviewGroupRow> _fboNewByPalletRows = [];
     private bool _fboNewOverviewOpen;
     private CancellationTokenSource? _fboNewOpenCts;
     private readonly DispatcherTimer _fboNewSelectTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
@@ -136,7 +133,6 @@ public partial class MainWindow : Window
         FboNewRemainingGrid.ItemsSource = _fboNewRemainingRows;
         FboNewByProductList.ItemsSource = _fboNewByProductRows;
         FboNewByCargoList.ItemsSource = _fboNewByCargoRows;
-        FboNewByPalletList.ItemsSource = _fboNewByPalletRows;
         FboYmRemainingGrid.ItemsSource = _ymRemainingRows;
         FboYmCargoGrid.ItemsSource = _ymCargoRows;
         OmJobsGrid.ItemsSource = _omJobRows;

@@ -95,7 +95,6 @@
 
         <ContextMenu x:Key="FboNewUnassignMenu" x:Shared="False">
             <MenuItem Header="Снять привязку к грузоместу" Tag="unassign" Click="OnFboNewUnassignClick"/>
-            <MenuItem Header="Снять привязку к паллету" Tag="pallet" Click="OnFboNewUnbindPalletClick"/>
         </ContextMenu>
         <Style x:Key="FboNewOverviewLine" TargetType="TextBlock">
             <Setter Property="Margin" Value="0,2"/>
@@ -342,10 +341,8 @@
                         <Button Content="Обновить" Click="OnReloadFboNew"/>
                         <TextBlock Grid.Column="1" x:Name="FboNewApiHint" VerticalAlignment="Center" Margin="12,0"/>
                         <StackPanel Grid.Column="2" Orientation="Horizontal">
-                            <Button Content="Печать листов" Click="OnFboNewPrintPalletSheets"
-                                    Padding="14,6" FontWeight="SemiBold"/>
                             <Button Content="Печать QR поставки" Click="OnFboNewPrintSupplyQr"
-                                    Padding="14,6" FontWeight="SemiBold" Margin="8,0,0,0"/>
+                                    Padding="14,6" FontWeight="SemiBold"/>
                             <Button x:Name="FboNewOverviewHeaderBtn"
                                     Content="Грузоместа" Click="OnFboNewOverviewToggle"
                                     Padding="16,6" FontWeight="SemiBold" MinWidth="140" Margin="8,0,0,0"/>
@@ -392,20 +389,9 @@
                                               Content="Печатать все свободные грузоместа"
                                               Margin="88,6,0,0"
                                               ToolTip="Выкл: только ещё не печатавшиеся. Вкл: все без присвоенного товара, в том числе уже печатавшиеся ШК."/>
-                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                        <TextBlock Text="Паллеты" VerticalAlignment="Center" Width="80"/>
-                                        <TextBox x:Name="FboNewPalletPrintCount" Width="48" Margin="8,0" Text="5"/>
-                                        <Button Content="Печать" Click="OnFboNewPrintPallets"/>
-                                        <Button Content="Перепечатать последний" Click="OnFboNewReprintLastPallet" Margin="8,0,0,0"/>
-                                    </StackPanel>
                                 </StackPanel>
                             </GroupBox>
-                            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                                <Button DockPanel.Dock="Right" x:Name="FboNewClosePalletBtn"
-                                        Content="Закрыть паллет" Click="OnFboNewClosePallet" Padding="12,4"/>
-                                <TextBlock x:Name="FboNewPalletText" Text="Сначала пикните паллет" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center"/>
-                            </DockPanel>
-                            <TextBlock x:Name="FboNewSelectedText" DockPanel.Dock="Top" Text="Пикните паллет" TextWrapping="Wrap" FontSize="15" Margin="0,0,0,8"/>
+                            <TextBlock x:Name="FboNewSelectedText" DockPanel.Dock="Top" Text="Пикните товар, затем грузоместо" TextWrapping="Wrap" FontSize="15" Margin="0,0,0,8"/>
                             <TextBlock x:Name="FboNewQtyWarning" DockPanel.Dock="Top" Text="" TextWrapping="Wrap"
                                        FontSize="20" FontWeight="Bold" Foreground="#C0392B"
                                        Margin="0,0,0,8" Visibility="Collapsed"/>
@@ -461,12 +447,6 @@
                                     <TabItem Header="Грузоместа">
                                         <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,8,0,0">
                                             <ItemsControl x:Name="FboNewByCargoList"
-                                                          ItemTemplate="{StaticResource FboNewOverviewGroupTemplate}"/>
-                                        </ScrollViewer>
-                                    </TabItem>
-                                    <TabItem Header="Паллеты">
-                                        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,8,0,0">
-                                            <ItemsControl x:Name="FboNewByPalletList"
                                                           ItemTemplate="{StaticResource FboNewOverviewGroupTemplate}"/>
                                         </ScrollViewer>
                                     </TabItem>
