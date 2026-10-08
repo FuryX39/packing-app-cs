@@ -375,6 +375,17 @@ public sealed class ApiClient : IDisposable
     public Task<byte[]> FboSheetDownloadSupplyQrAsync(int jobId, CancellationToken ct = default) =>
         ApiBytesAsync($"/api/v1/fbo-sheet-packing/jobs/{jobId}/supply-qr.pdf", 60, ct);
 
+    public Task<byte[]> FboSheetPalletSheetsAsync(
+        int jobId,
+        int? printCount,
+        int? palletTotal,
+        CancellationToken ct = default) =>
+        ApiPostBytesAsync(
+            $"/api/v1/fbo-sheet-packing/jobs/{jobId}/pallet-sheets.pdf",
+            new { print_count = printCount, pallet_total = palletTotal },
+            120,
+            ct);
+
     public Task<JsonMap> FboSheetResolveAsync(int jobId, string barcode, CancellationToken ct = default) =>
         ApiJsonAsync("POST", $"/api/v1/fbo-sheet-packing/jobs/{jobId}/resolve", new { barcode }, 30, ct);
 

@@ -324,10 +324,16 @@ public partial class MainWindow
         if (ReferenceEquals(textBox, _fboNewProductionDateTextBox))
             return;
         if (_fboNewProductionDateTextBox is not null)
+        {
             _fboNewProductionDateTextBox.TextChanged -= OnFboNewProductionDateTextChanged;
+            _fboNewProductionDateTextBox.LostKeyboardFocus -= OnFboNewProductionDateLostKeyboardFocus;
+        }
         _fboNewProductionDateTextBox = textBox;
         if (textBox is not null)
+        {
             textBox.TextChanged += OnFboNewProductionDateTextChanged;
+            textBox.LostKeyboardFocus += OnFboNewProductionDateLostKeyboardFocus;
+        }
     }
 
     private void OnFboNewProductionDateTextChanged(object sender, TextChangedEventArgs e)
@@ -343,8 +349,7 @@ public partial class MainWindow
             textBox.CaretIndex = formatted.Length;
             _fboNewFormattingProductionDate = false;
         }
-        if (digits.Length != 8 ||
-            !DateTime.TryParseExact(digits, "ddMMyyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+        if (digits.Length < 6 || !TryCompleteFboNewProductionDate(digits, out var date))
             return;
         if (FboNewProductionDate.SelectedDate != date)
             FboNewProductionDate.SelectedDate = date;
@@ -352,15 +357,88 @@ public partial class MainWindow
 
     private static string FormatFboNewProductionDate(string digits)
     {
-        if (digits.Length <= 1)
+        if (digits.Length <= 2)
             return digits;
-        if (digits.Length == 2)
-            return digits + ".";
-        if (digits.Length == 3)
+        if (digits.Length <= 4)
             return digits[..2] + "." + digits[2..];
-        if (digits.Length == 4)
-            return digits[..2] + "." + digits[2..] + ".";
         return digits[..2] + "." + digits.Substring(2, 2) + "." + digits[4..];
+    }
+
+    private static bool TryCompleteFboNewProductionDate(string? raw, out DateTime date)
+    {
+        var digits = new string((raw ?? "").Where(char.IsDigit).ToArray());
+        var year = DateTime.Today.Year;
+        string stamp = digits.Length switch
+        {
+            3 => "0" + digits + year.ToString("0000"),
+            4 => digits + year.ToString("0000"),
+            6 => digits[..4] + "20" + digits[4..],
+            8 => digits,
+            _ => "",
+        };
+        return DateTime.TryParseExact(
+            stamp,
+            "ddMMyyyy",
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out date);
+    }
+
+    private bool ApplyFboNewProductionDateCompletion(bool moveToQty, bool showError)
+    {
+        var raw = _fboNewProductionDateTextBox?.Text ?? FboNewProductionDate.Text ?? "";
+        var digits = new string(raw.Where(char.IsDigit).ToArray());
+        if (digits.Length == 0)
+        {
+            if (moveToQty && FboNewProductionDate.SelectedDate is not null)
+            {
+                FocusFboNewQuantity();
+                return true;
+            }
+            return false;
+        }
+        if (!moveToQty && digits.Length is not (4 or 6 or 8))
+            return false;
+        if (!TryCompleteFboNewProductionDate(raw, out var date))
+        {
+            if (showError)
+                MessageBox.Show(this, "Укажите дату производства: день и месяц, например 1709", "FBO WB new");
+            return false;
+        }
+        SetFboNewProductionDateValue(date, moveToQty);
+        return true;
+    }
+
+    private void SetFboNewProductionDateValue(DateTime date, bool moveToQty)
+    {
+        var formatted = date.ToString("dd.MM.yyyy");
+        _fboNewFormattingProductionDate = true;
+        try
+        {
+            if (_fboNewProductionDateTextBox is not null)
+            {
+                _fboNewProductionDateTextBox.Text = formatted;
+                _fboNewProductionDateTextBox.CaretIndex = formatted.Length;
+            }
+        }
+        finally
+        {
+            _fboNewFormattingProductionDate = false;
+        }
+        if (!moveToQty)
+            _fboNewChangingProductionDate = true;
+        try
+        {
+            if (FboNewProductionDate.SelectedDate != date)
+                FboNewProductionDate.SelectedDate = date;
+            else if (moveToQty)
+                FocusFboNewQuantity();
+        }
+        finally
+        {
+            if (!moveToQty)
+                _fboNewChangingProductionDate = false;
+        }
     }
 
     private void OnFboNewProductionDateChanged(object sender, SelectionChangedEventArgs e)
@@ -372,10 +450,15 @@ public partial class MainWindow
 
     private void OnFboNewProductionDateKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Enter || FboNewProductionDate.SelectedDate is null)
+        if (e.Key != Key.Enter)
             return;
         e.Handled = true;
-        FocusFboNewQuantity();
+        ApplyFboNewProductionDateCompletion(moveToQty: true, showError: true);
+    }
+
+    private void OnFboNewProductionDateLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        ApplyFboNewProductionDateCompletion(moveToQty: false, showError: false);
     }
 
     private void OnFboNewQtyKeyDown(object sender, KeyEventArgs e)
@@ -399,18 +482,23 @@ public partial class MainWindow
         return null;
     }
 
-    private string? ReadFboNewProductionDate()
+    private DateTime? ReadFboNewProductionDateValue()
     {
-        return FboNewProductionDate.SelectedDate?.ToString("yyyy-MM-dd");
+        if (FboNewProductionDate.SelectedDate is DateTime selected)
+            return selected.Date;
+        var raw = _fboNewProductionDateTextBox?.Text ?? FboNewProductionDate.Text;
+        if (TryCompleteFboNewProductionDate(raw, out var date))
+            return date.Date;
+        return null;
     }
 
     private string? ProductionDateForAssign()
     {
         if (_fboNewProduct is null || !_fboNewProduct.Flag("has_shelf_life"))
             return null;
-        var picked = ReadFboNewProductionDate();
-        if (!string.IsNullOrWhiteSpace(picked))
-            return picked;
+        ApplyFboNewProductionDateCompletion(moveToQty: false, showError: false);
+        if (ReadFboNewProductionDateValue() is DateTime picked)
+            return picked.ToString("yyyy-MM-dd");
         return RememberedProductionDate(_fboNewProduct)?.ToString("yyyy-MM-dd");
     }
 
@@ -486,6 +574,26 @@ public partial class MainWindow
         }, "Печать QR поставки...");
     }
 
+    private async void OnFboNewPrintPalletSheets(object sender, RoutedEventArgs e)
+    {
+        if (_fboNewJob is null)
+        {
+            MessageBox.Show(this, "Сначала откройте задание", "Печать А4");
+            return;
+        }
+        var options = ShowFboNewPalletSheetsDialog();
+        if (options is null) return;
+        var (printCount, palletTotal) = options.Value;
+        var jobId = _fboNewJob.Int("id");
+        await FboNewRunAsync(async () =>
+        {
+            var pdf = await _client.FboSheetPalletSheetsAsync(jobId, printCount, palletTotal);
+            await Task.Run(() => GdiPrinter.PrintPdf(pdf, _config.A4Profile()));
+            SetStatus("Упаковочные листы отправлены на печать");
+            FocusFboNewScan();
+        }, "Печать А4...");
+    }
+
     private int? ShowFboNewSupplyQrDialog()
     {
         var dialog = CreateFboNewPrintDialog("Печать QR поставки", 360);
@@ -525,6 +633,102 @@ public partial class MainWindow
             copiesBox.SelectAll();
         };
         return dialog.ShowDialog() == true ? result : null;
+    }
+
+    private (int? PrintCount, int? PalletTotal)? ShowFboNewPalletSheetsDialog()
+    {
+        var dialog = CreateFboNewPrintDialog("Печать А4", 430);
+        var panel = new StackPanel { Margin = new Thickness(16) };
+        panel.Children.Add(new TextBlock
+        {
+            Text = "Количество для печати",
+            Margin = new Thickness(0, 0, 0, 5),
+        });
+        var printCountBox = new TextBox
+        {
+            FontSize = 16,
+            Margin = new Thickness(0, 0, 0, 12),
+        };
+        panel.Children.Add(printCountBox);
+        panel.Children.Add(new TextBlock
+        {
+            Text = "Общее количество паллет",
+            Margin = new Thickness(0, 0, 0, 5),
+        });
+        var palletTotalBox = new TextBox
+        {
+            FontSize = 16,
+            Margin = new Thickness(0, 0, 0, 8),
+        };
+        panel.Children.Add(palletTotalBox);
+
+        var defaultCount = _fboNewJob?.Int("source_pallet_count") ?? 0;
+        if (defaultCount <= 0)
+            defaultCount = _fboNewJob?.Int("occupied_pallet_count") ?? 0;
+        panel.Children.Add(new TextBlock
+        {
+            Text = defaultCount > 0
+                ? $"Если поля пустые, будут напечатаны {defaultCount} упаковочных листов по QR поставки."
+                : "Укажите количество упаковочных листов и общее количество паллет.",
+            Foreground = Brushes.DimGray,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 14),
+        });
+
+        (int? PrintCount, int? PalletTotal)? result = null;
+        panel.Children.Add(CreateFboNewDialogButtons(
+            dialog,
+            () =>
+            {
+                if (!TryOptionalFboNewCount(
+                        printCountBox.Text,
+                        "Количество для печати",
+                        dialog,
+                        printCountBox,
+                        out var printCount) ||
+                    !TryOptionalFboNewCount(
+                        palletTotalBox.Text,
+                        "Общее количество паллет",
+                        dialog,
+                        palletTotalBox,
+                        out var palletTotal))
+                    return;
+                if (printCount is int count && palletTotal is int total && count > total)
+                {
+                    MessageBox.Show(
+                        dialog,
+                        "Количество для печати не может быть больше общего количества паллет",
+                        "Печать А4");
+                    printCountBox.Focus();
+                    printCountBox.SelectAll();
+                    return;
+                }
+                result = (printCount, palletTotal);
+                dialog.DialogResult = true;
+            }));
+        dialog.Content = panel;
+        dialog.Loaded += (_, _) => printCountBox.Focus();
+        return dialog.ShowDialog() == true ? result : null;
+    }
+
+    private bool TryOptionalFboNewCount(string? raw, string label, Window owner, TextBox? input, out int? value)
+    {
+        var text = (raw ?? "").Trim();
+        if (text.Length == 0)
+        {
+            value = null;
+            return true;
+        }
+        if (!int.TryParse(text, out var parsed) || parsed < 1 || parsed > 200)
+        {
+            MessageBox.Show(owner, $"{label}: укажите число от 1 до 200", "Печать А4");
+            input?.Focus();
+            input?.SelectAll();
+            value = null;
+            return false;
+        }
+        value = parsed;
+        return true;
     }
 
     private Window CreateFboNewPrintDialog(string title, double width) => new()
@@ -620,7 +824,7 @@ public partial class MainWindow
                 var productionDate = ProductionDateForAssign();
                 var payload = await _client.FboSheetAssignAsync(jobId, code, productBarcode, qty.Value, productionDate);
                 _fboNewJob = payload.Obj("job") ?? _fboNewJob;
-                if (FboNewProductionDate.SelectedDate is DateTime produced)
+                if (ReadFboNewProductionDateValue() is DateTime produced)
                 {
                     _fboNewProductionDates[productBarcode] = produced;
                     var producedSku = _fboNewProduct.Str("sku");
