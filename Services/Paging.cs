@@ -82,6 +82,7 @@ public static class Paging
         "pending" => "В сборке",
         "printed" => "Печать",
         "done" => "Готово",
+        "cancelled" => "Готово",
         _ => string.IsNullOrWhiteSpace(raw) ? "—" : raw,
     };
 
