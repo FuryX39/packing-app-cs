@@ -51,6 +51,7 @@ public sealed class CatalogRow : PhotoRow
 public sealed class FbsJobRow
 {
     public int Id { get; init; }
+    public string SupplyId { get; init; } = "";
     public string Platform { get; init; } = "";
     public string PlatformLabel { get; init; } = "";
     public string Title { get; init; } = "";

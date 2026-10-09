@@ -44,7 +44,7 @@ public partial class MainWindow
                 : _client.ApiError, "API упаковщиков");
             return;
         }
-        SetStatus("Загрузка заданий FBO WB new...");
+        SetStatus("Загрузка заданий WB FBO...");
         try
         {
             _fboNewJobs = await _client.FboSheetMyJobsAsync();
@@ -55,7 +55,7 @@ public partial class MainWindow
                 if (idx >= 0) _fboNewJobsPage = idx / Paging.PageSize;
             }
             RenderFboNewJobs();
-            SetStatus($"FBO WB new заданий: {_fboNewJobs.Count}");
+            SetStatus($"WB FBO заданий: {_fboNewJobs.Count}");
             FocusFboNewScan();
         }
         catch (Exception ex) { ShowError(ex); }
@@ -69,11 +69,13 @@ public partial class MainWindow
         _fboNewJobRows.Clear();
         foreach (var j in visible)
         {
+            var supplyId = j.Str("supply_id");
             _fboNewJobRows.Add(new FbsJobRow
             {
                 Id = j.Int("id"),
+                SupplyId = supplyId.Length > 0 ? supplyId : j.Str("id"),
                 Status = Paging.JobStatusRu(j.Str("status")),
-                Progress = $"{j.Int("box_assigned")}/{j.Int("box_total")}",
+                Progress = $"{j.Int("sku_done")}/{j.Int("sku_pending")}",
             });
         }
         var selected = _fboNewPendingJobId > 0 ? _fboNewPendingJobId : _fboNewJob?.IntOrNull("id");
@@ -142,7 +144,7 @@ public partial class MainWindow
     private void RenderFboNewJob()
     {
         var job = _fboNewJob;
-        var title = job is null ? "Выберите задание" : $"FBO WB new #{job.Str("id")}";
+        var title = job is null ? "Выберите задание" : $"WB FBO #{job.Str("id")}";
         if (job is not null && job.Str("supply_id").Length > 0)
             title += $" · поставка {job.Str("supply_id")}";
         FboNewJobTitle.Text = title;
@@ -402,7 +404,7 @@ public partial class MainWindow
         if (!TryCompleteFboNewProductionDate(raw, out var date))
         {
             if (showError)
-                MessageBox.Show(this, "Укажите дату производства: день и месяц, например 1709", "FBO WB new");
+                MessageBox.Show(this, "Укажите дату производства: день и месяц, например 1709", "WB FBO");
             return false;
         }
         SetFboNewProductionDateValue(date, moveToQty);
@@ -506,12 +508,12 @@ public partial class MainWindow
     {
         if (_fboNewJob is null)
         {
-            MessageBox.Show(this, "Сначала откройте задание", "FBO WB new");
+            MessageBox.Show(this, "Сначала откройте задание", "WB FBO");
             return;
         }
         if (!int.TryParse((FboNewPrintCount.Text ?? "").Trim(), out var count) || count <= 0)
         {
-            MessageBox.Show(this, "Укажите, сколько ШК грузомест напечатать", "FBO WB new");
+            MessageBox.Show(this, "Укажите, сколько ШК грузомест напечатать", "WB FBO");
             return;
         }
         var jobId = _fboNewJob.Int("id");
@@ -537,7 +539,7 @@ public partial class MainWindow
     {
         if (_fboNewJob is null || _fboNewLastPrintedBoxId <= 0)
         {
-            MessageBox.Show(this, "Нет последнего напечатанного ШК грузоместа", "FBO WB new");
+            MessageBox.Show(this, "Нет последнего напечатанного ШК грузоместа", "WB FBO");
             return;
         }
         var jobId = _fboNewJob.Int("id");
@@ -559,7 +561,7 @@ public partial class MainWindow
     {
         if (_fboNewJob is null)
         {
-            MessageBox.Show(this, "Сначала откройте задание", "FBO WB new");
+            MessageBox.Show(this, "Сначала откройте задание", "WB FBO");
             return;
         }
         var copies = ShowFboNewSupplyQrDialog();
@@ -618,7 +620,7 @@ public partial class MainWindow
             {
                 if (!int.TryParse(copiesBox.Text.Trim(), out var copies) || copies < 1 || copies > 9999)
                 {
-                    MessageBox.Show(dialog, "Укажите количество QR от 1 до 9999", "FBO WB new");
+                    MessageBox.Show(dialog, "Укажите количество QR от 1 до 9999", "WB FBO");
                     copiesBox.Focus();
                     copiesBox.SelectAll();
                     return;
@@ -792,7 +794,7 @@ public partial class MainWindow
     {
         if (_fboNewJob is null)
         {
-            MessageBox.Show(this, "Сначала откройте задание", "FBO WB new");
+            MessageBox.Show(this, "Сначала откройте задание", "WB FBO");
             return;
         }
         var code = (FboNewScanBox.Text ?? "").Trim();
@@ -881,7 +883,7 @@ public partial class MainWindow
         if (ex is AuthException) { ShowError(ex); return; }
         if (ex is ApiException)
         {
-            MessageBox.Show(this, ex.Message, "FBO WB new", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(this, ex.Message, "WB FBO", MessageBoxButton.OK, MessageBoxImage.Warning);
             SetStatus(ex.Message);
             FocusFboNewScan();
             return;
@@ -997,7 +999,7 @@ public partial class MainWindow
         var confirm = string.IsNullOrWhiteSpace(productBarcode)
             ? $"Снять все товары с грузоместа {boxCode}?"
             : $"Снять привязку товара к грузоместу {boxCode}?";
-        if (MessageBox.Show(this, confirm, "FBO WB new", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        if (MessageBox.Show(this, confirm, "WB FBO", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             return;
         await FboNewRunAsync(async () =>
         {

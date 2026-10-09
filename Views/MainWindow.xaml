@@ -146,7 +146,7 @@
             </StackPanel>
         </DockPanel>
         <TabControl x:Name="Tabs" Margin="10" SelectionChanged="OnTabChanged">
-            <TabItem Header="Упаковка FBO">
+            <TabItem Header="Яндекс FBO">
                 <DockPanel Margin="6">
                     <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <Button DockPanel.Dock="Left" Content="Обновить" Click="OnReloadFbo"/>
@@ -330,7 +330,7 @@
                     </Grid>
                 </DockPanel>
             </TabItem>
-            <TabItem Header="FBO WB new">
+            <TabItem Header="WB FBO">
                 <DockPanel Margin="6">
                     <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
@@ -358,7 +358,7 @@
                             <ColumnDefinition x:Name="FboNewOverviewCol" Width="0"/>
                         </Grid.ColumnDefinitions>
                         <DockPanel>
-                            <TextBlock DockPanel.Dock="Top" Text="Мои задания FBO WB new" Margin="0,0,0,4"/>
+                            <TextBlock DockPanel.Dock="Top" Text="Мои задания WB FBO" Margin="0,0,0,4"/>
                             <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,4,0,0">
                                 <Button Content="Назад" Click="OnFboNewJobsPrev" x:Name="FboNewJobsPrev"/>
                                 <TextBlock x:Name="FboNewJobsPageLabel" VerticalAlignment="Center" Margin="8,0"/>
@@ -367,7 +367,7 @@
                             <DataGrid x:Name="FboNewJobsGrid" Style="{StaticResource RowLinesGrid}"
                                       SelectionChanged="OnFboNewJobSelected">
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="№" Binding="{Binding Id}" Width="52" ElementStyle="{StaticResource CellText}"/>
+                                    <DataGridTextColumn Header="Поставка" Binding="{Binding SupplyId}" Width="88" ElementStyle="{StaticResource CellText}"/>
                                     <DataGridTextColumn Header="Статус" Binding="{Binding Status}" Width="*" ElementStyle="{StaticResource CellText}"/>
                                     <DataGridTextColumn Header="Готово" Binding="{Binding Progress}" Width="90" ElementStyle="{StaticResource CellText}"/>
                                 </DataGrid.Columns>
