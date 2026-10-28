@@ -1039,6 +1039,12 @@ public partial class MainWindow : Window
     {
         var job = _fbsJob;
         FbsJobTitle.Text = job is null ? "Выберите задание" : FbsJobName(job);
+        FbsWbDeliverBtn.Visibility = job?.Flag("can_wb_deliver") == true
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        FbsWbPrintQrBtn.Visibility = job?.Flag("can_wb_print_qr") == true
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         var done = job?.Int("line_done") ?? 0;
         var total = job?.Int("line_total") ?? 0;
         var pending = job?.Int("line_pending", job?.Int("remaining") ?? 0) ?? 0;

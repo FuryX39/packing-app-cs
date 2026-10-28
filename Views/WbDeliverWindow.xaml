@@ -1,0 +1,26 @@
+<Window x:Class="WarehousePacking.Views.WbDeliverWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Передать в доставку" SizeToContent="Height" Width="520"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+    <StackPanel Margin="12">
+        <TextBlock x:Name="SuppliesText" TextWrapping="Wrap" Margin="0,0,0,10" Foreground="#555"/>
+        <TextBlock Text="Место сдачи" FontWeight="SemiBold" Margin="0,0,0,4"/>
+        <StackPanel x:Name="PointsHost" Margin="0,0,0,10"/>
+        <TextBlock Text="Дата сдачи" FontWeight="SemiBold" Margin="0,0,0,4"/>
+        <DatePicker x:Name="DateBox" Margin="0,0,0,10" HorizontalAlignment="Left" Width="220"/>
+        <TextBlock Text="Способ передачи" FontWeight="SemiBold" Margin="0,0,0,4"/>
+        <RadioButton x:Name="TypeSelf" GroupName="WbShipType" Content="Самостоятельно"
+                     Margin="0,2,0,2" Checked="OnTypeChanged"/>
+        <RadioButton x:Name="TypeTk" GroupName="WbShipType" Content="Транспортной компанией"
+                     Margin="0,2,0,8" Checked="OnTypeChanged"/>
+        <StackPanel x:Name="TrnHost" Margin="0,0,0,10" Visibility="Collapsed">
+            <TextBlock Text="УИД ТРН" FontWeight="SemiBold" Margin="0,0,0,4"/>
+            <TextBox x:Name="TrnBox" MaxLength="64"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Отмена" IsCancel="True" Width="90" Margin="0,0,8,0"/>
+            <Button Content="Передать в доставку" IsDefault="True" Width="170" Click="OnSave"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

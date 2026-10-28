@@ -240,6 +240,33 @@ public sealed class ApiClient : IDisposable
     public Task<byte[]> FbsDownloadLineLabelsZipAsync(int jobId, CancellationToken ct = default) =>
         ApiBytesAsync($"/api/v1/fbs-packing/jobs/{jobId}/line-labels.zip", 180, ct);
 
+    public Task<JsonMap> FbsWbDeliveryMetaAsync(int jobId, CancellationToken ct = default) =>
+        ApiJsonAsync("GET", $"/api/v1/fbs-packing/jobs/{jobId}/wb-delivery", null, 30, ct);
+
+    public Task<byte[]> FbsWbDeliverAsync(
+        int jobId,
+        int shippingPointId,
+        string pointKey,
+        string shippingDt,
+        string shippingType,
+        string waybillUuid,
+        CancellationToken ct = default) =>
+        ApiPostBytesAsync(
+            $"/api/v1/fbs-packing/jobs/{jobId}/wb-delivery",
+            new
+            {
+                shipping_point_id = shippingPointId,
+                point_key = pointKey,
+                shipping_dt = shippingDt,
+                shipping_type = shippingType,
+                waybill_uuid = waybillUuid,
+            },
+            120,
+            ct);
+
+    public Task<byte[]> FbsWbSupplyQrAsync(int jobId, CancellationToken ct = default) =>
+        ApiBytesAsync($"/api/v1/fbs-packing/jobs/{jobId}/wb-delivery/qr.pdf", 60, ct);
+
     public async Task<List<JsonMap>> OtherMpMyJobsAsync(CancellationToken ct = default)
     {
         var body = await ApiJsonAsync("GET", "/api/v1/other-marketplaces/my", null, 30, ct);

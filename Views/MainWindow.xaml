@@ -463,6 +463,10 @@
                     <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <Button DockPanel.Dock="Left" Content="Обновить" Click="OnReloadFbs"/>
                         <Button DockPanel.Dock="Left" Content="Скачать ярлыки" Click="OnDownloadFbsLabels"/>
+                        <Button x:Name="FbsWbDeliverBtn" DockPanel.Dock="Left" Content="Передать в доставку"
+                                Click="OnFbsWbDeliver" Visibility="Collapsed"/>
+                        <Button x:Name="FbsWbPrintQrBtn" DockPanel.Dock="Left" Content="Напечатать QR поставок"
+                                Click="OnFbsWbPrintQr" Visibility="Collapsed"/>
                         <TextBlock x:Name="FbsCacheHint" VerticalAlignment="Center" Margin="12,0,0,0" Foreground="#555"/>
                         <TextBlock x:Name="FbsApiHint" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </DockPanel>
