@@ -396,6 +396,7 @@ public sealed class ApiClient : IDisposable
         int quantity,
         string? productionDate = null,
         string? cis = null,
+        IReadOnlyList<string>? cisList = null,
         CancellationToken ct = default)
     {
         var body = new Dictionary<string, object?>
@@ -406,7 +407,13 @@ public sealed class ApiClient : IDisposable
         };
         if (!string.IsNullOrWhiteSpace(productionDate))
             body["production_date"] = productionDate.Trim();
-        if (!string.IsNullOrWhiteSpace(cis))
+        var codes = (cisList ?? [])
+            .Select(item => (item ?? "").Trim())
+            .Where(item => item.Length > 0)
+            .ToList();
+        if (codes.Count > 0)
+            body["cis_list"] = codes;
+        else if (!string.IsNullOrWhiteSpace(cis))
             body["cis"] = cis.Trim();
         return ApiJsonAsync("POST", $"/api/v1/fbo-sheet-packing/jobs/{jobId}/assign", body, 30, ct);
     }

@@ -162,7 +162,7 @@ public partial class MainWindow
         FboNewJobStats.Text = $"грузоместа {assigned}/{total} · напечатано {printed} · не печатались {pending}{pcs}";
         RefreshFboNewSelectedText();
         FboNewCisHint.Text = job?.Flag("require_cis") == true
-            ? "Обязательная маркировка ЧЗ: для таких товаров пикайте КИЗ (Data Matrix), не обычный ШК."
+            ? "Маркировка ЧЗ: пикайте КИЗ подряд — количество растёт само, затем пикните грузоместо."
             : "";
         RenderFboNewRemaining();
         RenderFboNewOverview();
@@ -205,7 +205,13 @@ public partial class MainWindow
                 "WB FBO");
             return;
         }
+        if (_fboNewCisList.Count > 0)
+        {
+            MessageBox.Show(this, "Сначала пикните грузоместо для уже пропиканных КИЗ", "WB FBO");
+            return;
+        }
         _fboNewCis = "";
+        _fboNewCisList.Clear();
         ApplyFboNewProduct(group, null);
     }
 
@@ -227,7 +233,14 @@ public partial class MainWindow
         var sku = _fboNewProduct.Str("sku");
         var name = _fboNewProduct.Str("name", sku);
         var left = _fboNewProduct.Int("quantity", _fboNewProduct.Int("qty_plan") - _fboNewProduct.Int("qty_assigned"));
-        FboNewSelectedText.Text = $"Товар {sku} · {name} · баркод {_fboNewProduct.Str("barcode")} · осталось {left} шт. Пикните грузоместо.";
+        var cis = _fboNewCisList.Count;
+        var next = cis > 0
+            ? $"КИЗ {cis} шт. Пикните ещё КИЗ или грузоместо."
+            : _fboNewProduct.Flag("require_cis")
+                ? "Пикните КИЗ, затем грузоместо."
+                : "Пикните грузоместо.";
+        FboNewSelectedText.Text =
+            $"Товар {sku} · {name} · баркод {_fboNewProduct.Str("barcode")} · осталось {left} шт. {next}";
     }
 
     private void ApplyFboNewQtyWarning()
@@ -246,7 +259,41 @@ public partial class MainWindow
         MessageBox.Show(this, text, "Нестандартное грузоместо", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
-    private void ApplyFboNewProduct(JsonMap product, int? suggestedQty)
+    private static string FboNewCisKey(string raw) =>
+        (raw ?? "").Replace("\u001d", "").Trim();
+
+    private void AcceptFboNewCis(JsonMap product, string cis)
+    {
+        var key = FboNewCisKey(cis);
+        if (key.Length == 0)
+            throw new ApiException("Некорректный КИЗ");
+        if (_fboNewCisList.Any(item => FboNewCisKey(item) == key))
+            throw new ApiException("Этот КИЗ уже пропикан");
+        var barcode = product.Str("barcode");
+        var current = _fboNewProduct?.Str("barcode") ?? "";
+        if (_fboNewCisList.Count > 0 &&
+            !current.Equals(barcode, StringComparison.OrdinalIgnoreCase))
+            throw new ApiException("Сначала пикните грузоместо для уже пропиканных КИЗ");
+        var first = _fboNewCisList.Count == 0;
+        if (first)
+            ApplyFboNewProduct(product, suggestedQty: null, cisScan: true);
+        else
+            _fboNewProduct = product;
+        _fboNewCisList.Add(cis);
+        _fboNewCis = cis;
+        FboNewQtyBox.Text = _fboNewCisList.Count.ToString();
+        RefreshFboNewSelectedText();
+        if (first &&
+            _fboNewProduct?.Flag("has_shelf_life") == true &&
+            FboNewProductionDate.SelectedDate is null)
+        {
+            FocusFboNewProductFields();
+            return;
+        }
+        FocusFboNewScan();
+    }
+
+    private void ApplyFboNewProduct(JsonMap product, int? suggestedQty, bool cisScan = false)
     {
         var previousBarcode = _fboNewProduct?.Str("barcode") ?? "";
         var barcode = product.Str("barcode");
@@ -257,7 +304,12 @@ public partial class MainWindow
         FboNewQtyPanel.Visibility = Visibility.Visible;
         _fboNewQtyWarning = "";
         ApplyFboNewQtyWarning();
-        if (!sameProduct)
+        if (cisScan)
+        {
+            if (!sameProduct)
+                FboNewQtyBox.Text = "";
+        }
+        else if (!sameProduct)
         {
             var qtyText = "";
             if (FboNewRememberQty.IsChecked == true &&
@@ -278,6 +330,8 @@ public partial class MainWindow
         }
         ApplyFboNewProductionDate(product);
         RefreshFboNewSelectedText();
+        if (cisScan)
+            return;
         FocusFboNewProductFields();
     }
 
@@ -285,6 +339,7 @@ public partial class MainWindow
     {
         _fboNewProduct = null;
         _fboNewCis = "";
+        _fboNewCisList.Clear();
         FboNewQtyBox.Text = "";
         _fboNewChangingProductionDate = true;
         try
@@ -830,7 +885,16 @@ public partial class MainWindow
                 var product = resolved.Obj("product");
                 if (product is null)
                     throw new ApiException("Товар не распознан");
-                _fboNewCis = resolved.Flag("has_cis") ? resolved.Str("cis") : "";
+                if (resolved.Flag("has_cis"))
+                {
+                    AcceptFboNewCis(product, resolved.Str("cis"));
+                    ScanSounds.Ok();
+                    SetStatus($"КИЗ {_fboNewCisList.Count} · {product.Str("sku")}");
+                    return;
+                }
+                if (_fboNewCisList.Count > 0)
+                    throw new ApiException("Сначала пикните грузоместо для уже пропиканных КИЗ");
+                _fboNewCis = "";
                 ApplyFboNewProduct(product, resolved.IntOrNull("suggested_qty"));
                 ScanSounds.Ok();
                 SetStatus($"Товар {product.Str("sku")}");
@@ -840,13 +904,18 @@ public partial class MainWindow
             {
                 if (_fboNewProduct is null)
                     throw new ApiException("Сначала пикните товар, затем грузоместо");
-                var qty = ReadFboNewQty();
+                var cisList = _fboNewCisList.ToList();
+                if (_fboNewProduct.Flag("require_cis") && cisList.Count == 0)
+                    throw new ApiException("Отсканируйте маркировку честный знак в программе для упаковщика");
+                var qty = cisList.Count > 0 ? cisList.Count : ReadFboNewQty();
                 if (qty is null or <= 0)
                     throw new ApiException("Укажите количество товара в грузоместе");
                 var productBarcode = _fboNewProduct.Str("barcode");
                 var productionDate = ProductionDateForAssign();
                 var payload = await _client.FboSheetAssignAsync(
-                    jobId, code, productBarcode, qty.Value, productionDate, _fboNewCis);
+                    jobId, code, productBarcode, qty.Value, productionDate,
+                    cisList.Count > 0 ? null : _fboNewCis,
+                    cisList);
                 _fboNewJob = payload.Obj("job") ?? _fboNewJob;
                 if (ReadFboNewProductionDateValue() is DateTime produced)
                 {
@@ -855,13 +924,15 @@ public partial class MainWindow
                     if (producedSku.Length > 0)
                         _fboNewProductionDates[producedSku] = produced;
                 }
-                if (FboNewRememberQty.IsChecked == true)
+                if (FboNewRememberQty.IsChecked == true && cisList.Count == 0)
                 {
                     _fboNewRememberedQty[productBarcode] = qty.Value;
                     var sku = _fboNewProduct.Str("sku");
                     if (sku.Length > 0)
                         _fboNewRememberedQty[sku] = qty.Value;
                 }
+                _fboNewCisList.Clear();
+                _fboNewCis = "";
                 var box = payload.Obj("box");
                 var warning = payload.Str("qty_warning");
                 var remaining = (_fboNewJob?.Arr("remaining_groups") ?? [])
@@ -870,6 +941,8 @@ public partial class MainWindow
                     _fboNewProduct = remaining;
                 else
                     SyncFboNewSelectedProduct();
+                if (_fboNewProduct?.Flag("require_cis") == true)
+                    FboNewQtyBox.Text = "";
                 ApplyFboNewProductionDate(_fboNewProduct);
                 RefreshFboNewSelectedText();
                 RenderFboNewJob();
