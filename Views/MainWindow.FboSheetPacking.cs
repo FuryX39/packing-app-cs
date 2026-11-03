@@ -74,6 +74,8 @@ public partial class MainWindow
             {
                 Id = j.Int("id"),
                 SupplyId = supplyId.Length > 0 ? supplyId : j.Str("id"),
+                SupplyType = j.Str("supply_type"),
+                Transfer = j.Str("transfer_number"),
                 Status = Paging.JobStatusRu(j.Str("status")),
                 Progress = $"{j.Int("sku_done")}/{j.Int("sku_pending")}",
             });
@@ -147,6 +149,10 @@ public partial class MainWindow
         var title = job is null ? "Выберите задание" : $"WB FBO #{job.Str("id")}";
         if (job is not null && job.Str("supply_id").Length > 0)
             title += $" · поставка {job.Str("supply_id")}";
+        if (job is not null && job.Str("supply_type").Length > 0)
+            title += $" · {job.Str("supply_type")}";
+        if (job is not null && job.Str("transfer_number").Length > 0)
+            title += $" · перемещение {job.Str("transfer_number")}";
         FboNewJobTitle.Text = title;
         var assigned = job?.Int("box_assigned") ?? 0;
         var total = job?.Int("box_total") ?? 0;

@@ -57,6 +57,8 @@ public sealed class FbsJobRow
     public string Title { get; init; } = "";
     public string Status { get; init; } = "";
     public string Progress { get; init; } = "";
+    public string Transfer { get; init; } = "";
+    public string SupplyType { get; init; } = "";
 }
 
 public sealed class FbsLineRow : PhotoRow

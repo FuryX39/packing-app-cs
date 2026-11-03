@@ -352,7 +352,7 @@
                     </Grid>
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="260" MinWidth="200"/>
+                            <ColumnDefinition Width="360" MinWidth="280"/>
                             <ColumnDefinition Width="6"/>
                             <ColumnDefinition Width="*" MinWidth="360"/>
                             <ColumnDefinition x:Name="FboNewOverviewCol" Width="0"/>
@@ -367,9 +367,11 @@
                             <DataGrid x:Name="FboNewJobsGrid" Style="{StaticResource RowLinesGrid}"
                                       SelectionChanged="OnFboNewJobSelected">
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Поставка" Binding="{Binding SupplyId}" Width="88" ElementStyle="{StaticResource CellText}"/>
+                                    <DataGridTextColumn Header="Поставка" Binding="{Binding SupplyId}" Width="78" ElementStyle="{StaticResource CellText}"/>
+                                    <DataGridTextColumn Header="Тип" Binding="{Binding SupplyType}" Width="88" ElementStyle="{StaticResource CellText}"/>
+                                    <DataGridTextColumn Header="Перемещение" Binding="{Binding Transfer}" Width="88" ElementStyle="{StaticResource CellText}"/>
                                     <DataGridTextColumn Header="Статус" Binding="{Binding Status}" Width="*" ElementStyle="{StaticResource CellText}"/>
-                                    <DataGridTextColumn Header="Готово" Binding="{Binding Progress}" Width="90" ElementStyle="{StaticResource CellText}"/>
+                                    <DataGridTextColumn Header="Готово" Binding="{Binding Progress}" Width="72" ElementStyle="{StaticResource CellText}"/>
                                 </DataGrid.Columns>
                             </DataGrid>
                         </DockPanel>
