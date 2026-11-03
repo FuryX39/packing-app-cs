@@ -155,6 +155,9 @@ public partial class MainWindow
         var pcs = job is null ? "" : $" · шт. {job.Int("pcs_assigned")}/{job.Int("pcs_plan")}";
         FboNewJobStats.Text = $"грузоместа {assigned}/{total} · напечатано {printed} · не печатались {pending}{pcs}";
         RefreshFboNewSelectedText();
+        FboNewCisHint.Text = job?.Flag("require_cis") == true
+            ? "Обязательная маркировка ЧЗ: для таких товаров пикайте КИЗ (Data Matrix), не обычный ШК."
+            : "";
         RenderFboNewRemaining();
         RenderFboNewOverview();
         ApplyFboNewQtyWarning();
@@ -187,7 +190,17 @@ public partial class MainWindow
         if (FboNewRemainingGrid.SelectedItem is not RemainingRow row) return;
         var groups = _fboNewJob?.Arr("remaining_groups") ?? [];
         if (row.Index < 0 || row.Index >= groups.Count) return;
-        ApplyFboNewProduct(groups[row.Index], null);
+        var group = groups[row.Index];
+        if (group.Flag("require_cis"))
+        {
+            MessageBox.Show(
+                this,
+                "Отсканируйте маркировку честный знак в программе для упаковщика",
+                "WB FBO");
+            return;
+        }
+        _fboNewCis = "";
+        ApplyFboNewProduct(group, null);
     }
 
     private void OnFboNewManualToggle(object sender, RoutedEventArgs e)
@@ -265,6 +278,7 @@ public partial class MainWindow
     private void ClearFboNewProduct()
     {
         _fboNewProduct = null;
+        _fboNewCis = "";
         FboNewQtyBox.Text = "";
         _fboNewChangingProductionDate = true;
         try
@@ -810,6 +824,7 @@ public partial class MainWindow
                 var product = resolved.Obj("product");
                 if (product is null)
                     throw new ApiException("Товар не распознан");
+                _fboNewCis = resolved.Flag("has_cis") ? resolved.Str("cis") : "";
                 ApplyFboNewProduct(product, resolved.IntOrNull("suggested_qty"));
                 ScanSounds.Ok();
                 SetStatus($"Товар {product.Str("sku")}");
@@ -824,7 +839,8 @@ public partial class MainWindow
                     throw new ApiException("Укажите количество товара в грузоместе");
                 var productBarcode = _fboNewProduct.Str("barcode");
                 var productionDate = ProductionDateForAssign();
-                var payload = await _client.FboSheetAssignAsync(jobId, code, productBarcode, qty.Value, productionDate);
+                var payload = await _client.FboSheetAssignAsync(
+                    jobId, code, productBarcode, qty.Value, productionDate, _fboNewCis);
                 _fboNewJob = payload.Obj("job") ?? _fboNewJob;
                 if (ReadFboNewProductionDateValue() is DateTime produced)
                 {
