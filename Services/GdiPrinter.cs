@@ -15,6 +15,11 @@ public static class GdiPrinter
 {
     private static readonly object Gate = new();
     private const int PrintTimeoutSeconds = 90;
+    /// <summary>
+    /// Термопринтеры и GDI часто обрывают одно задание после ~50 страниц.
+    /// Пачки меньше этого порога, с отдельным таймаутом на каждую.
+    /// </summary>
+    public const int MaxPagesPerPrintJob = 25;
 
     public static IReadOnlyList<string> InstalledPrinters()
     {
@@ -47,7 +52,15 @@ public static class GdiPrinter
             PrintPdfs(documents, profile, copies);
             return;
         }
+        foreach (var chunk in Chunk(documents, MaxPagesPerPrintJob))
+            PrintPdfsIsolatedChunk(chunk, profile, copies);
+    }
 
+    private static void PrintPdfsIsolatedChunk(
+        List<byte[]> documents,
+        PrintProfile profile,
+        int copies)
+    {
         var directory = Path.Combine(
             Path.GetTempPath(),
             "WarehousePacking",
@@ -88,11 +101,12 @@ public static class GdiPrinter
             start.ArgumentList.Add(requestPath);
             using var process = Process.Start(start)
                 ?? throw new InvalidOperationException("Не удалось запустить процесс печати");
-            if (!process.WaitForExit(TimeSpan.FromSeconds(PrintTimeoutSeconds)))
+            var timeoutSeconds = IsolatedTimeoutSeconds(documents.Count);
+            if (!process.WaitForExit(TimeSpan.FromSeconds(timeoutSeconds)))
             {
                 try { process.Kill(entireProcessTree: true); } catch { }
                 throw new TimeoutException(
-                    $"Принтер не ответил за {PrintTimeoutSeconds} секунд. " +
+                    $"Принтер не ответил за {timeoutSeconds} секунд. " +
                     "Проверьте очередь печати и повторите ярлык.");
             }
             if (process.ExitCode != 0)
@@ -106,6 +120,22 @@ public static class GdiPrinter
         finally
         {
             try { Directory.Delete(directory, recursive: true); } catch { }
+        }
+    }
+
+    private static int IsolatedTimeoutSeconds(int pageCount) =>
+        Math.Clamp(PrintTimeoutSeconds + Math.Max(0, pageCount) * 3, PrintTimeoutSeconds, 240);
+
+    private static IEnumerable<List<T>> Chunk<T>(IReadOnlyList<T> items, int size)
+    {
+        var step = Math.Max(1, size);
+        for (var i = 0; i < items.Count; i += step)
+        {
+            var take = Math.Min(step, items.Count - i);
+            if (items is List<T> list)
+                yield return list.GetRange(i, take);
+            else
+                yield return items.Skip(i).Take(take).ToList();
         }
     }
 
@@ -139,26 +169,33 @@ public static class GdiPrinter
     {
         if (PeerPrint.IsRemote(profile.Printer))
         {
-            var remote = new List<byte[]>();
-            foreach (var pdf in pdfs)
-            {
-                if (pdf is { Length: > 0 })
-                    remote.Add(pdf);
-            }
-            PeerPrint.Print(remote, profile, copies);
+            var remote = pdfs.Where(item => item is { Length: > 0 }).ToList();
+            if (remote.Count == 0)
+                throw new InvalidOperationException("Пустой PDF");
+            foreach (var chunk in Chunk(remote, MaxPagesPerPrintJob))
+                PeerPrint.Print(chunk, profile, copies);
             return;
         }
+        var documents = pdfs.Where(item => item is { Length: > 0 }).ToList();
+        if (documents.Count == 0)
+            throw new InvalidOperationException("Пустой PDF");
+        foreach (var chunk in Chunk(documents, MaxPagesPerPrintJob))
+            PrintPdfsChunk(chunk, profile, copies, rotatePortrait);
+    }
+
+    private static void PrintPdfsChunk(
+        List<byte[]> documents,
+        PrintProfile profile,
+        int copies,
+        bool rotatePortrait)
+    {
         var options = PrintOptions.Parse(profile.Settings);
         var dpi = options.Paper == "a4" ? 200 : 300;
         var pages = new List<(Bitmap Bitmap, (double W, double H) Pts)>();
         try
         {
-            foreach (var pdf in pdfs)
-            {
-                if (pdf is null || pdf.Length == 0)
-                    continue;
+            foreach (var pdf in documents)
                 pages.AddRange(Rasterize(pdf, dpi, rotatePortrait));
-            }
             if (pages.Count == 0)
                 throw new InvalidOperationException("Пустой PDF");
             lock (Gate)

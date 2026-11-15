@@ -38,7 +38,15 @@ public sealed class ApiClient : IDisposable
         if (!raw.Contains("://"))
             raw = "http://" + raw;
         var uri = new Uri(raw);
-        var builder = new UriBuilder(uri) { Port = 8766, Path = "", Query = "", Fragment = "" };
+        // nginx :80/:443 already proxies /api/v1 to desktop API.
+        // Production web is :8766, desktop API is :8767. Legacy layout: API :8766.
+        var port = uri.Port switch
+        {
+            80 or 443 => uri.Port,
+            8766 => 8767,
+            _ => 8766,
+        };
+        var builder = new UriBuilder(uri) { Port = port, Path = "", Query = "", Fragment = "" };
         return builder.Uri.ToString().TrimEnd('/');
     }
 

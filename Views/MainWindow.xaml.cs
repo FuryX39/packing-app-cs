@@ -1323,7 +1323,7 @@ public partial class MainWindow : Window
         var sku = _selectedGroup.Str("sku");
         var pid = _selectedGroup.IntOrNull("product_id");
         await HandleAllocateAsync(
-            () => _client.FbsPickSkuAsync(jobId, sku, pid, FbsBatchBox.IsChecked == true, !LabelsCached, FbsSkipMpBox.IsChecked == true),
+            () => _client.FbsPickSkuAsync(jobId, sku, pid, FbsBatchBox.IsChecked == true, !LabelsCached, autoClose: false),
             "Выделение SKU...",
             sku.ToLowerInvariant());
     }
@@ -1381,7 +1381,7 @@ public partial class MainWindow : Window
             return;
         }
         await HandleAllocateAsync(
-            () => _client.FbsScanProductAsync(jobId, code, FbsBatchBox.IsChecked == true, !LabelsCached, FbsSkipMpBox.IsChecked == true),
+            () => _client.FbsScanProductAsync(jobId, code, FbsBatchBox.IsChecked == true, !LabelsCached, autoClose: false),
             "Пик товара...",
             scanKey);
     }
@@ -1521,26 +1521,40 @@ public partial class MainWindow : Window
             var printed = 0;
             Exception? printError = null;
             Exception? closeError = null;
-            try
+            var chunkSize = GdiPrinter.MaxPagesPerPrintJob;
+            for (var offset = 0; offset < pdfs.Count; offset += chunkSize)
             {
-                if (pdfs.Count > 0)
+                var take = Math.Min(chunkSize, pdfs.Count - offset);
+                try
                 {
-                    await Task.Run(() => GdiPrinter.PrintPdfsIsolated(pdfs, profile));
-                    printed = pdfs.Count;
+                    var chunkPdfs = pdfs.GetRange(offset, take);
+                    await Task.Run(() => GdiPrinter.PrintPdfsIsolated(chunkPdfs, profile));
+                    printed += take;
                 }
-            }
-            catch (Exception ex) { printError = ex; }
-            var needClose = lines.Where(l => l.IntOrNull("id") is not null && l.Str("status") != "done").ToList();
-            if (skip && jobId > 0 && needClose.Count > 0)
-            {
+                catch (Exception ex)
+                {
+                    printError = ex;
+                    break;
+                }
+                if (!skip || jobId <= 0)
+                    continue;
                 try
                 {
                     JsonMap? closed = null;
-                    foreach (var closeLine in needClose)
+                    for (var i = offset; i < offset + take && i < lines.Count; i++)
+                    {
+                        var closeLine = lines[i];
+                        if (closeLine.IntOrNull("id") is null || closeLine.Str("status") == "done")
+                            continue;
                         closed = await _client.FbsCloseLineAsync(jobId, closeLine.Int("id"));
+                    }
                     if (closed is not null) payload = closed;
                 }
-                catch (Exception ex) { closeError = ex; }
+                catch (Exception ex)
+                {
+                    closeError = ex;
+                    break;
+                }
             }
             _fbsJob = payload.Obj("job") ?? _fbsJob;
             var closedLines = payload.Arr("lines");
@@ -1550,14 +1564,14 @@ public partial class MainWindow : Window
             {
                 _lastScanCode = scanCode.Length > 0 ? scanCode : (line?.Str("sku") ?? "").ToLowerInvariant();
                 _lastScanSku = line?.Str("sku") ?? "";
-                _lastScanLineIds = lineIds;
+                _lastScanLineIds = printError is null ? lineIds : lineIds.Skip(printed).ToList();
             }
             RenderFbsJob();
             if (printError is not null)
             {
                 ScanSounds.Error();
                 MessageBox.Show(this, printError.Message, "Печать", MessageBoxButton.OK, MessageBoxImage.Error);
-                SetStatus($"Получено ярлыков: {printed}. Можно Перепечатать");
+                SetStatus($"Напечатано {printed} из {pdfs.Count}. Можно Перепечатать оставшиеся");
                 FocusScan();
                 return;
             }
