@@ -1406,7 +1406,7 @@ public partial class MainWindow : Window
         {
             var pdfs = await ResolvePdfsAsync(jobId, _lastScanLineIds, null);
             if (pdfs.Count > 0)
-                await Task.Run(() => GdiPrinter.PrintPdfsIsolated(pdfs, _config.LabelProfile()));
+                await Task.Run(() => GdiPrinter.PrintPdfs(pdfs, _config.LabelProfile()));
             SetStatus($"Ярлык перепечатан ({pdfs.Count})");
             FocusScan();
         }, "Перепечатка...");
@@ -1426,7 +1426,7 @@ public partial class MainWindow : Window
         {
             var pdfs = await ResolvePdfsAsync(jobId, ids, null);
             if (pdfs.Count > 0)
-                await Task.Run(() => GdiPrinter.PrintPdfsIsolated(pdfs, _config.LabelProfile()));
+                await Task.Run(() => GdiPrinter.PrintPdfs(pdfs, _config.LabelProfile()));
             SetStatus($"На повторную печать: {pdfs.Count} ярл.");
             FocusScan();
         }, "Перепечатка...");
@@ -1528,7 +1528,7 @@ public partial class MainWindow : Window
                 try
                 {
                     var chunkPdfs = pdfs.GetRange(offset, take);
-                    await Task.Run(() => GdiPrinter.PrintPdfsIsolated(chunkPdfs, profile));
+                    await Task.Run(() => GdiPrinter.PrintPdfs(chunkPdfs, profile));
                     printed += take;
                 }
                 catch (Exception ex)
