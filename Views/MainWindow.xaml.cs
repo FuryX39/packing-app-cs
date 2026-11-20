@@ -1518,6 +1518,9 @@ public partial class MainWindow : Window
                 payloadPdfs = [payload.Str("pdf_base64")];
             var lineIds = lines.Where(l => l.IntOrNull("id") is not null).Select(l => l.Int("id")).ToList();
             var pdfs = jobId > 0 ? await ResolvePdfsAsync(jobId, lineIds, payloadPdfs) : [];
+            _fbsJob = payload.Obj("job") ?? _fbsJob;
+            RenderFbsJob();
+            await Dispatcher.Yield();
             var printed = 0;
             Exception? printError = null;
             Exception? closeError = null;
