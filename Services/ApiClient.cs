@@ -405,7 +405,6 @@ public sealed class ApiClient : IDisposable
         string? productionDate = null,
         string? cis = null,
         IReadOnlyList<string>? cisList = null,
-        int boxId = 0,
         CancellationToken ct = default)
     {
         var body = new Dictionary<string, object?>
@@ -414,8 +413,6 @@ public sealed class ApiClient : IDisposable
             ["product_barcode"] = productBarcode,
             ["quantity"] = quantity,
         };
-        if (boxId > 0)
-            body["box_id"] = boxId;
         if (!string.IsNullOrWhiteSpace(productionDate))
             body["production_date"] = productionDate.Trim();
         var codes = (cisList ?? [])

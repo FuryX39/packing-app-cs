@@ -384,12 +384,7 @@ public partial class MainWindow
             _fboNewProductionDateTextBox?.Focus();
             return;
         }
-        if (ReadFboNewQty() is null or <= 0)
-        {
-            FocusFboNewQuantity();
-            return;
-        }
-        FocusFboNewScan();
+        FocusFboNewQuantity();
     }
 
     private void FocusFboNewQuantity()
@@ -917,12 +912,10 @@ public partial class MainWindow
                     throw new ApiException("Укажите количество товара в грузоместе");
                 var productBarcode = _fboNewProduct.Str("barcode");
                 var productionDate = ProductionDateForAssign();
-                var boxId = resolved.Obj("box")?.Int("id") ?? 0;
                 var payload = await _client.FboSheetAssignAsync(
                     jobId, code, productBarcode, qty.Value, productionDate,
                     cisList.Count > 0 ? null : _fboNewCis,
-                    cisList,
-                    boxId);
+                    cisList);
                 _fboNewJob = payload.Obj("job") ?? _fboNewJob;
                 if (ReadFboNewProductionDateValue() is DateTime produced)
                 {
