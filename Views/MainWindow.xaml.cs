@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Net.Http;
 using System.Net.Sockets;
+using System.Text.Json.Nodes;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -1176,6 +1177,128 @@ public partial class MainWindow : Window
         return one is null ? [] : [one];
     }
 
+    private void ApplyFbsJobPayload(JsonMap payload)
+    {
+        var incoming = payload.Obj("job");
+        if (incoming is null) return;
+        if (incoming.Flag("delta") && _fbsJob is not null)
+            _fbsJob = MergeFbsDelta(_fbsJob, incoming, payload);
+        else
+            _fbsJob = incoming;
+    }
+
+    private static string JsonNodeText(JsonNode? node)
+    {
+        if (node is null) return "";
+        if (node is JsonValue value)
+            return value.ToString() ?? "";
+        return node.ToString() ?? "";
+    }
+
+    private JsonMap MergeFbsDelta(JsonMap current, JsonMap delta, JsonMap payload)
+    {
+        var root = JsonNode.Parse(current.El.GetRawText())!.AsObject();
+        if (delta.Has("status"))
+            root["status"] = delta.Str("status");
+        foreach (var key in new[] { "line_total", "line_done", "line_pending", "line_printed", "remaining" })
+        {
+            if (delta.Has(key))
+                root[key] = delta.Int(key);
+        }
+
+        var patch = delta.Arr("lines");
+        if (patch.Count == 0)
+        {
+            var many = payload.Arr("lines");
+            if (many.Count > 0) patch = many;
+            else if (payload.Obj("line") is { } one) patch = [one];
+        }
+
+        var linesNode = root["lines"] as JsonArray ?? [];
+        var indexById = new Dictionary<int, int>();
+        for (var i = 0; i < linesNode.Count; i++)
+        {
+            if (linesNode[i] is not JsonObject item) continue;
+            var id = item["id"]?.GetValue<int>() ?? 0;
+            if (id > 0) indexById[id] = i;
+        }
+        foreach (var row in patch)
+        {
+            var id = row.Int("id");
+            if (id == 0) continue;
+            var node = JsonNode.Parse(row.El.GetRawText())!.AsObject();
+            if (indexById.TryGetValue(id, out var idx) && linesNode[idx] is JsonObject prev)
+            {
+                if (string.IsNullOrEmpty(JsonNodeText(node["image_url"]))
+                    && !string.IsNullOrEmpty(JsonNodeText(prev["image_url"])))
+                    node["image_url"] = JsonNodeText(prev["image_url"]);
+                linesNode[idx] = node;
+            }
+            else
+            {
+                indexById[id] = linesNode.Count;
+                linesNode.Add(node);
+            }
+        }
+        root["lines"] = linesNode;
+
+        var barcodeBySku = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var imageBySku = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var group in current.Arr("remaining_groups"))
+        {
+            var sku = group.Str("sku").Trim();
+            if (sku.Length == 0) continue;
+            if (group.Str("barcode").Length > 0) barcodeBySku[sku] = group.Str("barcode");
+            if (group.Str("image_url").Length > 0) imageBySku[sku] = group.Str("image_url");
+        }
+
+        var remaining = new JsonArray();
+        var grouped = new Dictionary<string, JsonObject>(StringComparer.OrdinalIgnoreCase);
+        var order = new List<string>();
+        foreach (var item in linesNode)
+        {
+            if (item is not JsonObject line) continue;
+            var sku = JsonNodeText(line["sku"]).Trim();
+            var image = JsonNodeText(line["image_url"]);
+            if (image.Length > 0 && sku.Length > 0)
+                imageBySku[sku] = image;
+            if (JsonNodeText(line["status"]) != "pending") continue;
+            var key = sku.Length > 0 ? sku : $"#{JsonNodeText(line["id"])}";
+            if (!grouped.TryGetValue(key, out var bucket))
+            {
+                bucket = new JsonObject
+                {
+                    ["sku"] = sku,
+                    ["product_id"] = line["product_id"]?.DeepClone(),
+                    ["name"] = JsonNodeText(line["product_name"]),
+                    ["quantity"] = 0,
+                    ["barcode"] = barcodeBySku.GetValueOrDefault(sku, ""),
+                    ["image_url"] = imageBySku.GetValueOrDefault(sku, image),
+                };
+                grouped[key] = bucket;
+                order.Add(key);
+            }
+            bucket["quantity"] = (bucket["quantity"]?.GetValue<int>() ?? 0) + 1;
+        }
+        foreach (var key in order)
+            remaining.Add(grouped[key]);
+        root["remaining_groups"] = remaining;
+
+        var actives = new JsonArray();
+        JsonNode? firstActive = null;
+        foreach (var item in linesNode)
+        {
+            if (item is not JsonObject line) continue;
+            if (JsonNodeText(line["status"]) != "printed") continue;
+            var clone = line.DeepClone();
+            actives.Add(clone);
+            firstActive ??= clone;
+        }
+        root["active_lines"] = actives;
+        root["active_line"] = firstActive?.DeepClone();
+        return JsonMap.Parse(root.ToJsonString());
+    }
+
     private List<JsonMap> PrintedLines()
     {
         if (_fbsJob is null) return [];
@@ -1194,12 +1317,13 @@ public partial class MainWindow : Window
 
     private async Task<bool> CancelPrintedOnServerAsync(int jobId)
     {
-        var fresh = await _client.FbsOpenJobAsync(jobId);
-        _fbsJob = fresh;
         var printed = PrintedLines();
-        if (printed.Count == 0) return false;
-        var payload = await _client.FbsCancelPrintAsync(jobId, printed[0].Int("id"));
-        _fbsJob = payload.Obj("job") ?? _fbsJob;
+        var lineId = printed.FirstOrDefault()?.Int("id")
+            ?? _fbsJob?.Arr("lines").FirstOrDefault()?.Int("id")
+            ?? 0;
+        if (lineId == 0) return false;
+        var payload = await _client.FbsCancelPrintAsync(jobId, lineId);
+        ApplyFbsJobPayload(payload);
         return true;
     }
 
@@ -1401,14 +1525,29 @@ public partial class MainWindow : Window
         catch { FbsBarcodeImage.Source = null; }
     }
 
-    private async void OnRemainingPick(object sender, RoutedEventArgs e)
+    private async void OnRemainingPick(object sender, RoutedEventArgs e) => await PickFbsRemainingAsync();
+
+    private async void OnRemainingPick(object sender, MouseButtonEventArgs e)
     {
-        // Двойной клик по стрелкам/ползунку скроллбара тоже всплывает как MouseDoubleClick
-        // у DataGrid — без проверки строки товар ошибочно берётся в работу.
-        if (e is MouseButtonEventArgs mouse
-            && FindParent<DataGridRow>(mouse.OriginalSource as DependencyObject) is null)
+        if (FindParent<System.Windows.Controls.Primitives.ScrollBar>(e.OriginalSource as DependencyObject) is not null)
             return;
-        if (_fbsJob is null || _selectedGroup is null) return;
+        var row = FindParent<DataGridRow>(e.OriginalSource as DependencyObject);
+        if (row is null && sender is DataGrid grid)
+        {
+            var hit = VisualTreeHelper.HitTest(grid, e.GetPosition(grid));
+            row = FindParent<DataGridRow>(hit?.VisualHit);
+        }
+        if (row?.Item is RemainingRow remaining)
+            FbsRemainingGrid.SelectedItem = remaining;
+        await PickFbsRemainingAsync();
+    }
+
+    private async Task PickFbsRemainingAsync()
+    {
+        if (FbsRemainingGrid.SelectedItem is not RemainingRow row || _fbsJob is null) return;
+        var groups = _fbsJob.Arr("remaining_groups");
+        if (row.Index < 0 || row.Index >= groups.Count) return;
+        _selectedGroup = groups[row.Index];
         var jobId = _fbsJob.Int("id");
         var sku = _selectedGroup.Str("sku");
         var pid = _selectedGroup.IntOrNull("product_id");
@@ -1454,7 +1593,7 @@ public partial class MainWindow : Window
             await FbsRunAsync(async () =>
             {
                 var payload = await _client.FbsScanLabelAsync(jobId, code);
-                _fbsJob = payload.Obj("job") ?? _fbsJob;
+                ApplyFbsJobPayload(payload);
                 RenderFbsJob();
                 var left = ActiveLines().Count;
                 ScanSounds.Ok();
@@ -1618,17 +1757,12 @@ public partial class MainWindow : Window
             }
             catch (ApiException ex) when (IsActivePrintLock(ex.Message))
             {
-                try
-                {
-                    _fbsJob = await _client.FbsOpenJobAsync(jobId);
-                    RenderFbsJob();
-                }
-                catch { /* оставляем текущий снимок, если refresh не удался */ }
                 if (!skip)
                     throw;
                 await CancelPrintedOnServerAsync(jobId);
                 payload = await worker();
             }
+            ApplyFbsJobPayload(payload);
             var lines = payload.Arr("lines");
             if (lines.Count == 0 && payload.Obj("line") is { } one) lines = [one];
             var payloadPdfs = payload.StrList("pdfs_base64");
@@ -1636,7 +1770,6 @@ public partial class MainWindow : Window
                 payloadPdfs = [payload.Str("pdf_base64")];
             var lineIds = lines.Where(l => l.IntOrNull("id") is not null).Select(l => l.Int("id")).ToList();
             var pdfs = jobId > 0 ? await ResolvePdfsAsync(jobId, lineIds, payloadPdfs) : [];
-            _fbsJob = payload.Obj("job") ?? _fbsJob;
             RenderFbsJob();
             await Dispatcher.Yield();
             var printed = 0;
@@ -1669,7 +1802,11 @@ public partial class MainWindow : Window
                             continue;
                         closed = await _client.FbsCloseLineAsync(jobId, closeLine.Int("id"));
                     }
-                    if (closed is not null) payload = closed;
+                    if (closed is not null)
+                    {
+                        payload = closed;
+                        ApplyFbsJobPayload(payload);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -1677,7 +1814,6 @@ public partial class MainWindow : Window
                     break;
                 }
             }
-            _fbsJob = payload.Obj("job") ?? _fbsJob;
             var closedLines = payload.Arr("lines");
             if (closedLines.Count == 0 && payload.Obj("line") is { } cl) closedLines = [cl];
             var line = closedLines.FirstOrDefault() ?? lines.FirstOrDefault();
@@ -1748,7 +1884,7 @@ public partial class MainWindow : Window
         await FbsRunAsync(async () =>
         {
             var payload = await _client.FbsSetLineStatusAsync(_fbsJob.Int("id"), lineId, next);
-            _fbsJob = payload.Obj("job") ?? _fbsJob;
+            ApplyFbsJobPayload(payload);
             RenderFbsJob();
             SetStatus($"Статус строки: {Paging.LineStatusRu(next)}");
             FocusScan();
