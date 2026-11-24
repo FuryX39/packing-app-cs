@@ -31,11 +31,20 @@ public partial class App : Application
         var login = new LoginWindow();
         if (login.ShowDialog() == true && login.Client is { } client)
         {
-            var main = new MainWindow(login.Config, client, login.UserName, login.UserId);
-            MainWindow = main;
-            main.Show();
-            ShutdownMode = ShutdownMode.OnMainWindowClose;
-            return;
+            try
+            {
+                var main = new MainWindow(login.Config, client, login.UserName, login.UserId);
+                MainWindow = main;
+                main.Show();
+                ShutdownMode = ShutdownMode.OnMainWindowClose;
+                return;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Ошибка запуска", MessageBoxButton.OK, MessageBoxImage.Error);
+                Shutdown();
+                return;
+            }
         }
         Shutdown();
     }

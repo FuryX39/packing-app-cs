@@ -396,7 +396,10 @@ public partial class MainWindow
                 .ToList();
             var pdfs = await ResolveFboPdfsAsync(jobId, _fboLastScanLineIds, null);
             if (pdfs.Count > 0)
+            {
                 await Task.Run(() => GdiPrinter.PrintPdfs(pdfs, _config.LabelProfile()));
+                ShowPrintToast();
+            }
             SetStatus($"Ярлык перепечатан ({pdfs.Count})");
             ShowFboQtyWarningDialog(FboQtyWarnings(reprinted));
             FocusFboScan();
@@ -417,7 +420,10 @@ public partial class MainWindow
         {
             var pdfs = await ResolveFboPdfsAsync(jobId, ids, null);
             if (pdfs.Count > 0)
+            {
                 await Task.Run(() => GdiPrinter.PrintPdfs(pdfs, _config.LabelProfile()));
+                ShowPrintToast();
+            }
             SetStatus($"На повторную печать: {pdfs.Count} ярл.");
             ShowFboQtyWarningDialog(FboQtyWarnings(actives));
             FocusFboScan();
@@ -477,6 +483,7 @@ public partial class MainWindow
         {
             var pdf = await _client.FboDownloadSupplyQrAsync(_fboJob.Int("id"));
             await Task.Run(() => GdiPrinter.PrintPdf(pdf, _config.LabelProfile()));
+            ShowPrintToast();
             SetStatus("QR поставки отправлен на печать");
             FocusFboScan();
         }, "Печать QR поставки...");
@@ -493,6 +500,7 @@ public partial class MainWindow
         {
             var pdf = await _client.FboDownloadPalletSheetsAsync(_fboJob.Int("id"));
             await Task.Run(() => GdiPrinter.PrintPdf(pdf, _config.A4Profile()));
+            ShowPrintToast();
             SetStatus("Листы паллет отправлены на печать");
             FocusFboScan();
         }, "Печать листов...");
@@ -571,6 +579,8 @@ public partial class MainWindow
             _fboLastScanLineIds = lineIds;
             _fboQtyWarning = string.Join("\n", qtyWarnings);
             RenderFboJob();
+            if (printed > 0)
+                ShowPrintToast();
             SetStatus(printed > 0 ? $"Напечатано этикеток: {printed}" : "Строка выделена");
             ShowFboQtyWarningDialog(qtyWarnings);
             if (printError is not null) throw printError;

@@ -3,18 +3,19 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Warehouse Packing"
         Height="720" Width="1100"
+        Background="#F3F5F8"
         WindowStartupLocation="CenterScreen"
         Closing="OnClosing">
     <Window.Resources>
         <Style x:Key="FlatCell" TargetType="DataGridCell">
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Padding" Value="8,3"/>
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="#1B1B1B"/>
+            <Setter Property="Foreground" Value="#1A1D21"/>
             <Style.Triggers>
                 <Trigger Property="IsSelected" Value="True">
                     <Setter Property="Background" Value="Transparent"/>
-                    <Setter Property="Foreground" Value="#1B1B1B"/>
+                    <Setter Property="Foreground" Value="#1A1D21"/>
                     <Setter Property="BorderThickness" Value="0"/>
                 </Trigger>
             </Style.Triggers>
@@ -24,10 +25,10 @@
             <Setter Property="Background" Value="Transparent"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#F0F6FB"/>
+                    <Setter Property="Background" Value="#F3F6FA"/>
                 </Trigger>
                 <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#CFE5F7"/>
+                    <Setter Property="Background" Value="#DCEBFF"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -35,13 +36,13 @@
         <Style x:Key="TaskRowStyle" TargetType="DataGridRow" BasedOn="{StaticResource FlatRow}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Tag}" Value="today">
-                    <Setter Property="Background" Value="#FFE0E3"/>
+                    <Setter Property="Background" Value="#FDECEC"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Tag}" Value="tomorrow">
-                    <Setter Property="Background" Value="#FFF6D0"/>
+                    <Setter Property="Background" Value="#FFF6D6"/>
                 </DataTrigger>
                 <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#CFE5F7"/>
+                    <Setter Property="Background" Value="#DCEBFF"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -52,11 +53,12 @@
         </Style>
 
         <Style x:Key="RowHeader" TargetType="DataGridColumnHeader">
-            <Setter Property="Background" Value="#F5F5F5"/>
-            <Setter Property="Foreground" Value="#444"/>
+            <Setter Property="Background" Value="#FAFBFC"/>
+            <Setter Property="Foreground" Value="#667085"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="8,6"/>
-            <Setter Property="BorderBrush" Value="#DDD"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="BorderBrush" Value="#E4E8EE"/>
             <Setter Property="BorderThickness" Value="0,0,0,1"/>
             <Setter Property="HorizontalContentAlignment" Value="Left"/>
         </Style>
@@ -74,12 +76,12 @@
             <Setter Property="SelectionMode" Value="Single"/>
             <Setter Property="SelectionUnit" Value="FullRow"/>
             <Setter Property="GridLinesVisibility" Value="Horizontal"/>
-            <Setter Property="HorizontalGridLinesBrush" Value="#E4E4E4"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="#EEF1F4"/>
             <Setter Property="Background" Value="White"/>
             <Setter Property="RowBackground" Value="Transparent"/>
-            <Setter Property="BorderBrush" Value="#DDD"/>
+            <Setter Property="BorderBrush" Value="#E4E8EE"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="RowHeight" Value="36"/>
+            <Setter Property="RowHeight" Value="32"/>
             <Setter Property="CellStyle" Value="{StaticResource FlatCell}"/>
             <Setter Property="RowStyle" Value="{StaticResource FlatRow}"/>
             <Setter Property="ColumnHeaderStyle" Value="{StaticResource RowHeader}"/>
@@ -87,10 +89,11 @@
             <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
         </Style>
 
-        <Style x:Key="CellButton" TargetType="Button">
-            <Setter Property="Padding" Value="10,3"/>
-            <Setter Property="Margin" Value="0,3"/>
+        <Style x:Key="CellButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+            <Setter Property="Padding" Value="8,2"/>
+            <Setter Property="Margin" Value="0,2"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="FontSize" Value="11"/>
         </Style>
 
         <ContextMenu x:Key="FboNewUnassignMenu" x:Shared="False">
@@ -135,19 +138,23 @@
         </DataTemplate>
     </Window.Resources>
 
+    <Grid>
     <DockPanel>
         <StatusBar DockPanel.Dock="Bottom">
             <TextBlock x:Name="StatusText" Text="Готово"/>
         </StatusBar>
-        <DockPanel DockPanel.Dock="Top" Margin="10,10,10,0">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="Настройки" Click="OnSettings"/>
-                <Button Content="Выйти" Click="OnLogout"/>
-            </StackPanel>
-        </DockPanel>
-        <TabControl x:Name="Tabs" Margin="10" SelectionChanged="OnTabChanged">
+        <Border DockPanel.Dock="Top" Background="White" BorderBrush="#E4E8EE" BorderThickness="0,0,0,1" Padding="12,6">
+            <DockPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" DockPanel.Dock="Right">
+                    <Button Content="Настройки" Click="OnSettings"/>
+                    <Button Content="Выйти" Click="OnLogout" Margin="0"/>
+                </StackPanel>
+                <TextBlock Text="Упаковка" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+            </DockPanel>
+        </Border>
+        <TabControl x:Name="Tabs" SelectionChanged="OnTabChanged">
             <TabItem Header="Яндекс FBO">
-                <DockPanel Margin="6">
+                <DockPanel Margin="4">
                     <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <Button DockPanel.Dock="Left" Content="Обновить" Click="OnReloadFbo"/>
                         <Button x:Name="FboWbDownloadLabels" DockPanel.Dock="Left" Content="Скачать ярлыки" Click="OnDownloadFboLabels"/>
@@ -164,7 +171,8 @@
                             <ColumnDefinition Width="*" MinWidth="480"/>
                         </Grid.ColumnDefinitions>
                         <DockPanel>
-                            <TextBlock x:Name="FboJobsHeader" DockPanel.Dock="Top" Text="Мои задания FBO" Margin="0,0,0,4"/>
+                            <TextBlock x:Name="FboJobsHeader" DockPanel.Dock="Top" Text="Мои задания FBO"
+                                       FontWeight="SemiBold" Foreground="#3D4650" Margin="0,0,0,8"/>
                             <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,4,0,0">
                                 <Button Content="Назад" Click="OnFboJobsPrev" x:Name="FboJobsPrev"/>
                                 <TextBlock x:Name="FboJobsPageLabel" VerticalAlignment="Center" Margin="8,0"/>
@@ -189,7 +197,7 @@
                             </DockPanel>
                             <GroupBox Header="Активное грузоместо (наклеить этикетку)" DockPanel.Dock="Top" Margin="0,8" Padding="8">
                                 <DockPanel>
-                                    <Border DockPanel.Dock="Left" Width="110" Height="110" Background="#F3F3F3" BorderBrush="#CCC" BorderThickness="1" Margin="0,0,10,0">
+                                    <Border DockPanel.Dock="Left" Width="110" Height="110" Background="#F3F6FA" BorderBrush="#E4E8EE" BorderThickness="1" CornerRadius="10" Margin="0,0,12,0">
                                         <Image x:Name="FboActiveImage" Stretch="Uniform"/>
                                     </Border>
                                     <StackPanel>
@@ -205,9 +213,9 @@
                                 </DockPanel>
                             </GroupBox>
                             <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                                <TextBlock Text="Сканер" VerticalAlignment="Center"/>
-                                <Button DockPanel.Dock="Right" Content="OK" Click="OnFboScan"/>
-                                <TextBox x:Name="FboScanBox" Margin="8,0" KeyDown="OnFboScanKey"/>
+                                <TextBlock Text="Сканер" VerticalAlignment="Center" Foreground="#667085" FontWeight="SemiBold"/>
+                                <Button DockPanel.Dock="Right" Content="OK" Style="{StaticResource PrimaryButton}" Click="OnFboScan"/>
+                                <TextBox x:Name="FboScanBox" Style="{StaticResource ScanBox}" Margin="8,0" KeyDown="OnFboScanKey"/>
                             </DockPanel>
                             <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,4">
                                 <CheckBox x:Name="FboManualBox" Content="Ручная сборка (остаток + ШК с экрана)" Click="OnFboManualToggle"/>
@@ -281,7 +289,7 @@
                                 </DockPanel>
                                 <GroupBox Header="Товар и грузоместо" DockPanel.Dock="Top" Margin="0,8" Padding="8">
                                     <DockPanel>
-                                        <Border DockPanel.Dock="Left" Width="110" Height="110" Background="#F3F3F3" BorderBrush="#CCC" BorderThickness="1" Margin="0,0,10,0">
+                                        <Border DockPanel.Dock="Left" Width="110" Height="110" Background="#F3F6FA" BorderBrush="#E4E8EE" BorderThickness="1" CornerRadius="10" Margin="0,0,12,0">
                                             <Image x:Name="FboYmActiveImage" Stretch="Uniform"/>
                                         </Border>
                                         <StackPanel>
@@ -294,9 +302,9 @@
                                     </DockPanel>
                                 </GroupBox>
                                 <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                                    <TextBlock Text="Сканер" VerticalAlignment="Center"/>
-                                    <Button DockPanel.Dock="Right" Content="OK" Click="OnYmScan"/>
-                                    <TextBox x:Name="FboYmScanBox" Margin="8,0" KeyDown="OnYmScanKey"/>
+                                    <TextBlock Text="Сканер" VerticalAlignment="Center" Foreground="#667085" FontWeight="SemiBold"/>
+                                    <Button DockPanel.Dock="Right" Content="OK" Style="{StaticResource PrimaryButton}" Click="OnYmScan"/>
+                                    <TextBox x:Name="FboYmScanBox" Style="{StaticResource ScanBox}" Margin="8,0" KeyDown="OnYmScanKey"/>
                                 </DockPanel>
                                 <GroupBox Header="Остаток к сборке" DockPanel.Dock="Top" Height="200" Margin="0,0,0,8">
                                     <DataGrid x:Name="FboYmRemainingGrid" Style="{StaticResource RowLinesGrid}"
@@ -331,7 +339,7 @@
                 </DockPanel>
             </TabItem>
             <TabItem Header="WB FBO">
-                <DockPanel Margin="6">
+                <DockPanel Margin="4">
                     <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -342,12 +350,12 @@
                         <TextBlock Grid.Column="1" x:Name="FboNewApiHint" VerticalAlignment="Center" Margin="12,0"/>
                         <StackPanel Grid.Column="2" Orientation="Horizontal">
                             <Button Content="Печать А4" Click="OnFboNewPrintPalletSheets"
-                                    Padding="14,6" FontWeight="SemiBold"/>
+                                    Style="{StaticResource PrimaryButton}"/>
                             <Button Content="Печать QR поставки" Click="OnFboNewPrintSupplyQr"
-                                    Padding="14,6" FontWeight="SemiBold" Margin="8,0,0,0"/>
+                                    Style="{StaticResource PrimaryButton}"/>
                             <Button x:Name="FboNewOverviewHeaderBtn"
                                     Content="Грузоместа" Click="OnFboNewOverviewToggle"
-                                    Padding="16,6" FontWeight="SemiBold" MinWidth="140" Margin="8,0,0,0"/>
+                                    MinWidth="140"/>
                         </StackPanel>
                     </Grid>
                     <Grid>
@@ -358,7 +366,8 @@
                             <ColumnDefinition x:Name="FboNewOverviewCol" Width="0"/>
                         </Grid.ColumnDefinitions>
                         <DockPanel>
-                            <TextBlock DockPanel.Dock="Top" Text="Мои задания WB FBO" Margin="0,0,0,4"/>
+                            <TextBlock DockPanel.Dock="Top" Text="Мои задания WB FBO"
+                                       FontWeight="SemiBold" Foreground="#3D4650" Margin="0,0,0,8"/>
                             <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,4,0,0">
                                 <Button Content="Назад" Click="OnFboNewJobsPrev" x:Name="FboNewJobsPrev"/>
                                 <TextBlock x:Name="FboNewJobsPageLabel" VerticalAlignment="Center" Margin="8,0"/>
@@ -386,7 +395,7 @@
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="Грузоместа" VerticalAlignment="Center" Width="80"/>
                                         <TextBox x:Name="FboNewPrintCount" Width="48" Margin="8,0" Text="10"/>
-                                        <Button Content="Печать" Click="OnFboNewPrintBoxes"/>
+                                        <Button Content="Печать" Style="{StaticResource PrimaryButton}" Click="OnFboNewPrintBoxes"/>
                                         <Button Content="Перепечатать последний" Click="OnFboNewReprintLast" Margin="8,0,0,0"/>
                                     </StackPanel>
                                     <CheckBox x:Name="FboNewPrintAllFree"
@@ -412,9 +421,9 @@
                                 <CheckBox x:Name="FboNewRememberQty" Content="Количество для всех последующих грузомест с этим SKU" VerticalAlignment="Center" Margin="16,0,0,0"/>
                             </StackPanel>
                             <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                                <TextBlock Text="Сканер" VerticalAlignment="Center"/>
-                                <Button DockPanel.Dock="Right" Content="OK" Click="OnFboNewScan"/>
-                                <TextBox x:Name="FboNewScanBox" Margin="8,0" FontSize="18" Height="32" KeyDown="OnFboNewScanKey"/>
+                                <TextBlock Text="Сканер" VerticalAlignment="Center" Foreground="#667085" FontWeight="SemiBold"/>
+                                <Button DockPanel.Dock="Right" Content="OK" Style="{StaticResource PrimaryButton}" Click="OnFboNewScan"/>
+                                <TextBox x:Name="FboNewScanBox" Style="{StaticResource ScanBox}" Margin="8,0" KeyDown="OnFboNewScanKey"/>
                             </DockPanel>
                             <CheckBox x:Name="FboNewManualBox" DockPanel.Dock="Top" Content="Ручная сборка (остаток + ШК с экрана)"
                                       Click="OnFboNewManualToggle" Margin="0,0,0,8"/>
@@ -439,7 +448,7 @@
                             </GroupBox>
                         </DockPanel>
                         <Border Grid.Column="3" x:Name="FboNewOverviewPanel" Visibility="Collapsed"
-                                BorderBrush="#DDD" BorderThickness="1,0,0,0" Background="White" Padding="8,0,0,0">
+                                BorderBrush="#E4E8EE" BorderThickness="1,0,0,0" Background="White" Padding="12,0,0,0" CornerRadius="0,10,10,0">
                             <DockPanel>
                                 <TextBlock DockPanel.Dock="Top" Text="Грузоместа" FontWeight="SemiBold" Margin="0,0,0,8"/>
                                 <TabControl>
@@ -462,7 +471,7 @@
                 </DockPanel>
             </TabItem>
             <TabItem Header="Упаковка FBS">
-                <DockPanel Margin="6">
+                <DockPanel Margin="4">
                     <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <Button DockPanel.Dock="Left" Content="Обновить" Click="OnReloadFbs"/>
                         <Button DockPanel.Dock="Left" Content="Скачать ярлыки" Click="OnDownloadFbsLabels"/>
@@ -476,7 +485,8 @@
                             <ColumnDefinition Width="*" MinWidth="480"/>
                         </Grid.ColumnDefinitions>
                         <DockPanel>
-                            <TextBlock DockPanel.Dock="Top" Text="Мои задания FBS" Margin="0,0,0,4"/>
+                            <TextBlock DockPanel.Dock="Top" Text="Мои задания FBS"
+                                       FontWeight="SemiBold" Foreground="#3D4650" Margin="0,0,0,8"/>
                             <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,4,0,0">
                                 <Button Content="Назад" Click="OnFbsJobsPrev" x:Name="FbsJobsPrev"/>
                                 <TextBlock x:Name="FbsJobsPageLabel" VerticalAlignment="Center" Margin="8,0"/>
@@ -499,7 +509,7 @@
                             </DockPanel>
                             <GroupBox Header="Активная строка (наклеить ярлык заказа)" DockPanel.Dock="Top" Margin="0,8" Padding="8">
                                 <DockPanel>
-                                    <Border DockPanel.Dock="Left" Width="110" Height="110" Background="#F3F3F3" BorderBrush="#CCC" BorderThickness="1" Margin="0,0,10,0">
+                                    <Border DockPanel.Dock="Left" Width="110" Height="110" Background="#F3F6FA" BorderBrush="#E4E8EE" BorderThickness="1" CornerRadius="10" Margin="0,0,12,0">
                                         <Image x:Name="FbsActiveImage" Stretch="Uniform"/>
                                     </Border>
                                     <StackPanel>
@@ -513,9 +523,9 @@
                             </GroupBox>
                             <TextBlock x:Name="FbsCisHint" DockPanel.Dock="Top" Foreground="#A33" TextWrapping="Wrap" Margin="0,0,0,4"/>
                             <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                                <TextBlock Text="Сканер" VerticalAlignment="Center"/>
-                                <Button DockPanel.Dock="Right" Content="OK" Click="OnFbsScan"/>
-                                <TextBox x:Name="FbsScanBox" Margin="8,0" KeyDown="OnFbsScanKey"/>
+                                <TextBlock Text="Сканер" VerticalAlignment="Center" Foreground="#667085" FontWeight="SemiBold"/>
+                                <Button DockPanel.Dock="Right" Content="OK" Style="{StaticResource PrimaryButton}" Click="OnFbsScan"/>
+                                <TextBox x:Name="FbsScanBox" Style="{StaticResource ScanBox}" Margin="8,0" KeyDown="OnFbsScanKey"/>
                             </DockPanel>
                             <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,4">
                                 <CheckBox x:Name="FbsManualBox" Content="Ручная сборка (остаток + ШК с экрана)" Click="OnFbsManualToggle"/>
@@ -547,7 +557,7 @@
                                     </DataGrid>
                                     <StackPanel Grid.Column="1" Margin="10,0,0,0">
                                         <TextBlock Text="ШК для сканера"/>
-                                        <Border Width="180" Height="80" Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="0,6">
+                                        <Border Width="180" Height="80" Background="White" BorderBrush="#E4E8EE" BorderThickness="1" CornerRadius="8" Margin="0,6">
                                             <Image x:Name="FbsBarcodeImage" Stretch="Uniform"/>
                                         </Border>
                                         <Button Content="Взять (тап)" Click="OnRemainingPick"/>
@@ -596,7 +606,7 @@
                 </DockPanel>
             </TabItem>
             <TabItem Header="Номенклатура">
-                <DockPanel Margin="6">
+                <DockPanel Margin="4">
                     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
                         <TextBlock Text="Кол-во этикеток" VerticalAlignment="Center"/>
                         <TextBox x:Name="CatalogQtyBox" Width="60" Text="1" Margin="8,0"/>
@@ -613,7 +623,7 @@
                         <TextBlock x:Name="CatalogPageLabel" VerticalAlignment="Center" Margin="8,0"/>
                         <Button Content="Вперёд" Click="OnCatalogNext" x:Name="CatalogNext"/>
                     </StackPanel>
-                    <DataGrid x:Name="CatalogGrid" Style="{StaticResource RowLinesGrid}" RowHeight="44"
+                    <DataGrid x:Name="CatalogGrid" Style="{StaticResource RowLinesGrid}" RowHeight="36"
                               PreviewMouseRightButtonDown="OnGridRightButtonDown"
                               ContextMenuOpening="OnCatalogContextOpening">
                         <DataGrid.ContextMenu>
@@ -647,7 +657,7 @@
                 </DockPanel>
             </TabItem>
             <TabItem Header="Задания" Visibility="Collapsed">
-                <DockPanel Margin="6">
+                <DockPanel Margin="4">
                     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
                         <Button Content="Обновить" Click="OnReloadTasks"/>
                         <Button Content="Печать все А4" Click="OnPrintAllA4"/>
@@ -661,7 +671,8 @@
                             <ColumnDefinition Width="2*"/>
                         </Grid.ColumnDefinitions>
                         <DockPanel>
-                            <TextBlock DockPanel.Dock="Top" Text="Мои задания" Margin="0,0,0,4"/>
+                            <TextBlock DockPanel.Dock="Top" Text="Мои задания"
+                                       FontWeight="SemiBold" Foreground="#3D4650" Margin="0,0,0,8"/>
                             <DataGrid x:Name="TasksGrid" Style="{StaticResource RowLinesGrid}"
                                       RowStyle="{StaticResource TaskRowStyle}"
                                       SelectionChanged="OnTaskSelected">
@@ -702,7 +713,7 @@
                 </DockPanel>
             </TabItem>
             <TabItem Header="Прочие маркетплейсы">
-                <DockPanel Margin="6">
+                <DockPanel Margin="4">
                     <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <Button DockPanel.Dock="Left" Content="Обновить" Click="OnReloadOtherMp"/>
                         <TextBlock VerticalAlignment="Center" Margin="12,0,0,0" Text="ВсеИнструменты"/>
@@ -714,7 +725,8 @@
                             <ColumnDefinition Width="*" MinWidth="480"/>
                         </Grid.ColumnDefinitions>
                         <DockPanel>
-                            <TextBlock DockPanel.Dock="Top" Text="Мои задания" Margin="0,0,0,4"/>
+                            <TextBlock DockPanel.Dock="Top" Text="Мои задания"
+                                       FontWeight="SemiBold" Foreground="#3D4650" Margin="0,0,0,8"/>
                             <DataGrid x:Name="OmJobsGrid" Style="{StaticResource RowLinesGrid}" SelectionChanged="OnOmJobSelected">
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="№" Binding="{Binding Id}" Width="52" ElementStyle="{StaticResource CellText}"/>
@@ -732,7 +744,7 @@
                             </DockPanel>
                             <GroupBox Header="Последний пик" DockPanel.Dock="Top" Margin="0,8,0,0" Padding="8">
                                 <DockPanel>
-                                    <Border DockPanel.Dock="Left" Width="72" Height="72" Background="#F3F3F3" BorderBrush="#CCC" BorderThickness="1" Margin="0,0,10,0">
+                                    <Border DockPanel.Dock="Left" Width="72" Height="72" Background="#F3F6FA" BorderBrush="#E4E8EE" BorderThickness="1" CornerRadius="8" Margin="0,0,12,0">
                                         <Image x:Name="OmActiveImage" Stretch="Uniform"/>
                                     </Border>
                                     <TextBlock x:Name="OmActiveText" Text="Нет активного товара — пикните товар. Ярлык заказа сам не печатается." TextWrapping="Wrap"/>
@@ -741,9 +753,9 @@
                             <TextBlock x:Name="OmCisHint" DockPanel.Dock="Top" Foreground="#A33" TextWrapping="Wrap" Margin="0,8,0,4"/>
                             <TextBlock x:Name="OmScanWarning" DockPanel.Dock="Top" Foreground="#A33" FontWeight="Bold" FontSize="16" TextWrapping="Wrap" Margin="0,0,0,8"/>
                             <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                                <TextBlock Text="Сканер" VerticalAlignment="Center"/>
-                                <Button DockPanel.Dock="Right" Content="OK" Click="OnOmScan"/>
-                                <TextBox x:Name="OmScanBox" Margin="8,0" KeyDown="OnOmScanKey"/>
+                                <TextBlock Text="Сканер" VerticalAlignment="Center" Foreground="#667085" FontWeight="SemiBold"/>
+                                <Button DockPanel.Dock="Right" Content="OK" Style="{StaticResource PrimaryButton}" Click="OnOmScan"/>
+                                <TextBox x:Name="OmScanBox" Style="{StaticResource ScanBox}" Margin="8,0" KeyDown="OnOmScanKey"/>
                             </DockPanel>
                             <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
                                 <CheckBox x:Name="OmManualBox" Content="Ручная сборка (остаток + ШК с экрана)" Click="OnOmManualToggle"/>
@@ -774,7 +786,7 @@
                                     </DataGrid>
                                     <StackPanel Grid.Column="1" Margin="10,0,0,0">
                                         <TextBlock Text="ШК поставки"/>
-                                        <Border Width="180" Height="80" Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="0,6">
+                                        <Border Width="180" Height="80" Background="White" BorderBrush="#E4E8EE" BorderThickness="1" CornerRadius="8" Margin="0,6">
                                             <Image x:Name="OmBarcodeImage" Stretch="Uniform"/>
                                         </Border>
                                         <Button Content="Взять (тап)" Click="OnOmRemainingPick"/>
@@ -831,23 +843,23 @@
                     </Grid.RowDefinitions>
                     <DockPanel Margin="0,0,0,14">
                         <StackPanel DockPanel.Dock="Left">
-                            <TextBlock Text="Моя выработка" FontSize="22" FontWeight="SemiBold"/>
+                            <TextBlock Text="Моя выработка" FontSize="18" FontWeight="SemiBold"/>
                             <TextBlock Text="Упакованные товары по дням и заданиям"
                                        Foreground="#666" Margin="0,3,0,0"/>
                         </StackPanel>
                         <TextBlock x:Name="ProductivityTotalText" DockPanel.Dock="Right"
-                                   VerticalAlignment="Center" FontSize="18"
+                                   VerticalAlignment="Center" FontSize="15"
                                    FontWeight="SemiBold"/>
                     </DockPanel>
-                    <Border Grid.Row="1" Background="#F4F6F8" CornerRadius="6"
-                            Padding="10" Margin="0,0,0,12">
+                    <Border Grid.Row="1" Background="White" BorderBrush="#E4E8EE" BorderThickness="1"
+                            CornerRadius="10" Padding="10" Margin="0,0,0,12">
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                             <Button Content="‹" Width="38" FontSize="18"
                                     Click="OnProductivityPreviousMonth"/>
                             <TextBlock x:Name="ProductivityMonthText"
                                        Width="180" TextAlignment="Center"
                                        VerticalAlignment="Center"
-                                       FontSize="16" FontWeight="SemiBold"/>
+                                       FontSize="14" FontWeight="SemiBold"/>
                             <Button Content="›" Width="38" FontSize="18"
                                     Click="OnProductivityNextMonth"/>
                         </StackPanel>
@@ -862,8 +874,8 @@
                             <ItemsControl x:Name="ProductivityDays">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border BorderBrush="#D7DCE1" BorderThickness="1"
-                                                CornerRadius="6" Margin="0,0,0,8"
+                                        <Border BorderBrush="#E4E8EE" BorderThickness="1"
+                                                CornerRadius="10" Margin="0,0,0,8"
                                                 Background="White">
                                             <Expander>
                                                 <Expander.Header>
@@ -873,11 +885,11 @@
                                                             <ColumnDefinition Width="Auto"/>
                                                         </Grid.ColumnDefinitions>
                                                         <TextBlock Text="{Binding Date}"
-                                                                   FontSize="16" FontWeight="SemiBold"/>
+                                                                   FontSize="14" FontWeight="SemiBold"/>
                                                         <TextBlock Grid.Column="1"
                                                                    Text="{Binding QuantityText}"
                                                                    FontSize="16" FontWeight="SemiBold"
-                                                                   Foreground="#245A88"/>
+                                                                   Foreground="#1F6FEB"/>
                                                     </Grid>
                                                 </Expander.Header>
                                                 <ItemsControl ItemsSource="{Binding Tasks}" Margin="36,0,14,12">
@@ -921,4 +933,12 @@
             </TabItem>
         </TabControl>
     </DockPanel>
+        <StackPanel x:Name="ToastPanel"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Margin="0,16,16,0"
+                    Panel.ZIndex="1000"
+                    Focusable="False"
+                    IsHitTestVisible="False"/>
+    </Grid>
 </Window>

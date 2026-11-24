@@ -602,7 +602,10 @@ public partial class MainWindow
                 _fboNewLastPrintedBoxId = boxes[^1].Int("id");
             var pdfs = DecodeFboNewPdfs(payload);
             if (pdfs.Count > 0)
+            {
                 await Task.Run(() => GdiPrinter.PrintPdfs(pdfs, _config.LabelProfile()));
+                ShowPrintToast();
+            }
             RenderFboNewJob();
             RenderFboNewJobs();
             SetStatus($"Напечатано ШК грузомест: {pdfs.Count}");
@@ -625,7 +628,10 @@ public partial class MainWindow
             _fboNewJob = payload.Obj("job") ?? _fboNewJob;
             var pdfs = DecodeFboNewPdfs(payload);
             if (pdfs.Count > 0)
+            {
                 await Task.Run(() => GdiPrinter.PrintPdfs(pdfs, _config.LabelProfile()));
+                ShowPrintToast();
+            }
             RenderFboNewJob();
             SetStatus("Ярлык грузоместа перепечатан");
             FocusFboNewScan();
@@ -646,6 +652,7 @@ public partial class MainWindow
         {
             var pdf = await _client.FboSheetDownloadSupplyQrAsync(jobId);
             await Task.Run(() => GdiPrinter.PrintPdf(pdf, _config.LabelProfile(), copies.Value));
+            ShowPrintToast();
             SetStatus($"QR поставки отправлен на печать: {copies.Value} шт.");
             FocusFboNewScan();
         }, "Печать QR поставки...");
@@ -666,6 +673,7 @@ public partial class MainWindow
         {
             var pdf = await _client.FboSheetPalletSheetsAsync(jobId, printCount, palletTotal);
             await Task.Run(() => GdiPrinter.PrintPdf(pdf, _config.A4Profile()));
+            ShowPrintToast();
             SetStatus("Упаковочные листы отправлены на печать");
             FocusFboNewScan();
         }, "Печать А4...");

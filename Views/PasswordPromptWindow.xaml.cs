@@ -27,7 +27,10 @@ public partial class PasswordPromptWindow : Window
 
     private void OnPasswordKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Enter)
+        if (e.Key == Key.Enter || e.Key == Key.Return)
+        {
+            e.Handled = true;
             OnOpen(sender, e);
+        }
     }
 }

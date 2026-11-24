@@ -41,21 +41,23 @@ public partial class MainWindow
     private async Task EnterProductivityAsync()
     {
         var prompt = new PasswordPromptWindow { Owner = this };
-        if (prompt.ShowDialog() != true)
+        var ok = prompt.ShowDialog() == true;
+        if (!ok)
         {
             ReturnFromProductivity();
             return;
         }
 
+        KeepProductivityTab();
         _productivityPassword = prompt.Password;
         try
         {
             await LoadProductivityAsync();
+            KeepProductivityTab();
         }
         catch (Exception exc)
         {
-            if (Tabs.SelectedIndex != ProductivityTabIndex)
-                return;
+            KeepProductivityTab();
             var message = exc is ApiException { StatusCode: 401 }
                 ? "Неверный пароль текущего аккаунта."
                 : exc.Message;
@@ -63,6 +65,15 @@ public partial class MainWindow
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             ReturnFromProductivity();
         }
+    }
+
+    private void KeepProductivityTab()
+    {
+        if (Tabs.SelectedIndex == ProductivityTabIndex)
+            return;
+        _productivityTabTransition = true;
+        Tabs.SelectedIndex = ProductivityTabIndex;
+        _productivityTabTransition = false;
     }
 
     private async Task LoadProductivityAsync()

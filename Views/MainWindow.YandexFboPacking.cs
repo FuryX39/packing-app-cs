@@ -280,6 +280,7 @@ public partial class MainWindow
             var pdf = await _client.YandexFboLabelsPdfAsync(_ymJob.Int("id"));
             await Task.Run(() => GdiPrinter.PrintPdf(
                 pdf, _config.LabelProfile(), copies: 2, rotatePortrait: true));
+            ShowPrintToast();
             SetStatus("Ярлыки грузомест отправлены на печать (2 копии)");
             FocusYmScan();
         }, "Печать грузомест...");

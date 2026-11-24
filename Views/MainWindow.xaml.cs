@@ -6,6 +6,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using WarehousePacking.Models;
@@ -170,6 +172,63 @@ public partial class MainWindow : Window
 
     private void SetStatus(string text) => StatusText.Text = text;
 
+    private void ShowPrintToast() => ShowToast("Отправлено на печать");
+
+    private void ShowToast(string message)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(() => ShowToast(message));
+            return;
+        }
+        var card = new Border
+        {
+            Background = new SolidColorBrush(Color.FromArgb(235, 28, 28, 28)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(14, 10, 14, 10),
+            Margin = new Thickness(0, 0, 0, 8),
+            MinWidth = 200,
+            MaxWidth = 340,
+            Opacity = 0,
+            Focusable = false,
+            IsHitTestVisible = false,
+            Effect = new DropShadowEffect
+            {
+                BlurRadius = 16,
+                ShadowDepth = 2,
+                Opacity = 0.35,
+                Color = Colors.Black,
+            },
+            Child = new TextBlock
+            {
+                Text = message,
+                Foreground = Brushes.White,
+                FontSize = 14,
+                FontWeight = FontWeights.SemiBold,
+                TextWrapping = TextWrapping.Wrap,
+                Focusable = false,
+            },
+        };
+        ToastPanel.Children.Insert(0, card);
+        while (ToastPanel.Children.Count > 3)
+            ToastPanel.Children.RemoveAt(ToastPanel.Children.Count - 1);
+
+        var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(140));
+        card.BeginAnimation(UIElement.OpacityProperty, fadeIn);
+
+        var hide = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.4) };
+        hide.Tick += (_, _) =>
+        {
+            hide.Stop();
+            var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(280));
+            fadeOut.Completed += (_, _) => ToastPanel.Children.Remove(card);
+            card.BeginAnimation(UIElement.OpacityProperty, fadeOut);
+        };
+        hide.Start();
+    }
+
     private async void OnClosing(object sender, System.ComponentModel.CancelEventArgs e)
     {
         _tasksTimer.Stop();
@@ -296,7 +355,11 @@ public partial class MainWindow : Window
         }
         _printBusy = true;
         SetStatus(status);
-        try { await Task.Run(work); }
+        try
+        {
+            await Task.Run(work);
+            ShowPrintToast();
+        }
         catch (Exception ex) { ShowError(ex); }
         finally { _printBusy = false; }
     }
@@ -1113,6 +1176,33 @@ public partial class MainWindow : Window
         return one is null ? [] : [one];
     }
 
+    private List<JsonMap> PrintedLines()
+    {
+        if (_fbsJob is null) return [];
+        var fromActive = ActiveLines().Where(l => l.Str("status") is "printed" or "").ToList();
+        var fromLines = _fbsJob.Arr("lines").Where(l => l.Str("status") == "printed").ToList();
+        if (fromLines.Count > 0) return fromLines;
+        return fromActive;
+    }
+
+    private static bool IsActivePrintLock(string message)
+    {
+        var text = message ?? "";
+        return text.Contains("наклейте ярлык", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("отмените печать", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task<bool> CancelPrintedOnServerAsync(int jobId)
+    {
+        var fresh = await _client.FbsOpenJobAsync(jobId);
+        _fbsJob = fresh;
+        var printed = PrintedLines();
+        if (printed.Count == 0) return false;
+        var payload = await _client.FbsCancelPrintAsync(jobId, printed[0].Int("id"));
+        _fbsJob = payload.Obj("job") ?? _fbsJob;
+        return true;
+    }
+
     private List<JsonMap> LastPickedLines()
     {
         var ids = _lastScanLineIds.ToHashSet();
@@ -1323,7 +1413,7 @@ public partial class MainWindow : Window
         var sku = _selectedGroup.Str("sku");
         var pid = _selectedGroup.IntOrNull("product_id");
         await HandleAllocateAsync(
-            () => _client.FbsPickSkuAsync(jobId, sku, pid, FbsBatchBox.IsChecked == true, !LabelsCached, autoClose: false),
+            () => _client.FbsPickSkuAsync(jobId, sku, pid, FbsBatchBox.IsChecked == true, !LabelsCached, FbsSkipMpBox.IsChecked == true),
             "Выделение SKU...",
             sku.ToLowerInvariant());
     }
@@ -1381,7 +1471,7 @@ public partial class MainWindow : Window
             return;
         }
         await HandleAllocateAsync(
-            () => _client.FbsScanProductAsync(jobId, code, FbsBatchBox.IsChecked == true, !LabelsCached, autoClose: false),
+            () => _client.FbsScanProductAsync(jobId, code, FbsBatchBox.IsChecked == true, !LabelsCached, FbsSkipMpBox.IsChecked == true),
             "Пик товара...",
             scanKey);
     }
@@ -1406,7 +1496,10 @@ public partial class MainWindow : Window
         {
             var pdfs = await ResolvePdfsAsync(jobId, _lastScanLineIds, null);
             if (pdfs.Count > 0)
+            {
                 await Task.Run(() => GdiPrinter.PrintPdfsIsolated(pdfs, _config.LabelProfile()));
+                ShowPrintToast();
+            }
             SetStatus($"Ярлык перепечатан ({pdfs.Count})");
             FocusScan();
         }, "Перепечатка...");
@@ -1426,7 +1519,10 @@ public partial class MainWindow : Window
         {
             var pdfs = await ResolvePdfsAsync(jobId, ids, null);
             if (pdfs.Count > 0)
+            {
                 await Task.Run(() => GdiPrinter.PrintPdfsIsolated(pdfs, _config.LabelProfile()));
+                ShowPrintToast();
+            }
             SetStatus($"На повторную печать: {pdfs.Count} ярл.");
             FocusScan();
         }, "Перепечатка...");
@@ -1434,16 +1530,21 @@ public partial class MainWindow : Window
 
     private async void OnFbsCancelPrint(object sender, RoutedEventArgs e)
     {
-        var active = ActiveLines().FirstOrDefault();
-        if (_fbsJob is null || active is null)
+        if (_fbsJob is null)
         {
-            MessageBox.Show(this, "Нет активной строки", "FBS");
+            MessageBox.Show(this, "Сначала откройте задание", "FBS");
             return;
         }
         await FbsRunAsync(async () =>
         {
-            var payload = await _client.FbsCancelPrintAsync(_fbsJob.Int("id"), active.Int("id"));
-            _fbsJob = payload.Obj("job") ?? _fbsJob;
+            var jobId = _fbsJob.Int("id");
+            if (!await CancelPrintedOnServerAsync(jobId))
+            {
+                RenderFbsJob();
+                MessageBox.Show(this, "Нет строк в печати. Можно пикать следующий товар.", "FBS");
+                FocusScan();
+                return;
+            }
             RenderFbsJob();
             SetStatus("Печать отменена, КИЗ сброшен, строки снова в сборке");
             FocusScan();
@@ -1510,7 +1611,24 @@ public partial class MainWindow : Window
         var profile = _config.LabelProfile();
         await FbsRunAsync(async () =>
         {
-            var payload = await worker();
+            JsonMap payload;
+            try
+            {
+                payload = await worker();
+            }
+            catch (ApiException ex) when (IsActivePrintLock(ex.Message))
+            {
+                try
+                {
+                    _fbsJob = await _client.FbsOpenJobAsync(jobId);
+                    RenderFbsJob();
+                }
+                catch { /* оставляем текущий снимок, если refresh не удался */ }
+                if (!skip)
+                    throw;
+                await CancelPrintedOnServerAsync(jobId);
+                payload = await worker();
+            }
             var lines = payload.Arr("lines");
             if (lines.Count == 0 && payload.Obj("line") is { } one) lines = [one];
             var payloadPdfs = payload.StrList("pdfs_base64");
@@ -1585,6 +1703,8 @@ public partial class MainWindow : Window
             }
             else
                 ScanSounds.Ok();
+            if (printed > 0)
+                ShowPrintToast();
             var sku = line?.Str("sku") ?? "";
             var cis = line?.Flag("has_cis") == true ? " · КИЗ записан" : "";
             if (printed > 1)

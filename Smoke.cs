@@ -32,7 +32,10 @@ internal static class Smoke
         Directory.CreateDirectory(dir);
         CheckLabel(dir);
         CheckWindow(dir);
-        Console.WriteLine(_failures == 0 ? "SMOKE OK" : $"SMOKE FAILED ({_failures})");
+        var summary = _failures == 0 ? "SMOKE OK" : $"SMOKE FAILED ({_failures})";
+        Console.WriteLine(summary);
+        try { File.WriteAllText(Path.Combine(dir, "result.txt"), summary); }
+        catch { /* ignore */ }
         return _failures;
     }
 
@@ -86,7 +89,18 @@ internal static class Smoke
         }
         Pass("logged in to fake server (web + api sessions)");
 
-        var main = new MainWindow(AppConfig.Load(), client, "smoke");
+        MainWindow main;
+        try
+        {
+            main = new MainWindow(AppConfig.Load(), client, "smoke");
+        }
+        catch (Exception ex)
+        {
+            var dump = Path.Combine(dir, "main_ctor.txt");
+            File.WriteAllText(dump, ex.ToString());
+            Fail($"MainWindow ctor: {ex.GetType().Name}: {ex.Message}");
+            return;
+        }
         main.Width = 1400;
         main.Height = 900;
         main.WindowState = WindowState.Normal;
