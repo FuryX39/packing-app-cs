@@ -96,10 +96,17 @@ public sealed class JsonMap
 
     public List<string> StrList(string name)
     {
+        return StrListKeepEmpty(name).Where(s => s.Length > 0).ToList();
+    }
+
+    public List<string> StrListKeepEmpty(string name)
+    {
         var p = Prop(name);
         if (p is null || p.Value.ValueKind != JsonValueKind.Array)
             return [];
-        return p.Value.EnumerateArray().Select(x => x.ValueKind == JsonValueKind.String ? x.GetString() ?? "" : x.ToString()).Where(s => s.Length > 0).ToList();
+        return p.Value.EnumerateArray()
+            .Select(x => x.ValueKind == JsonValueKind.String ? x.GetString() ?? "" : x.ToString())
+            .ToList();
     }
 }
 

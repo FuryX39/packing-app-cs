@@ -332,7 +332,7 @@ public partial class MainWindow
         var pid = _fboSelectedGroup.IntOrNull("product_id");
         var jobId = _fboJob.Int("id");
         await HandleFboAllocateAsync(
-            () => _client.FboPickSkuAsync(jobId, sku, pid, FboBatchBox.IsChecked == true, true, FboSkipMpBox.IsChecked == true),
+            () => _client.FboPickSkuAsync(jobId, sku, pid, batch: true, includePdf: true, autoClose: false),
             "Пик товара...",
             sku.ToLowerInvariant());
     }
@@ -368,7 +368,7 @@ public partial class MainWindow
             return;
         }
         await HandleFboAllocateAsync(
-            () => _client.FboScanProductAsync(jobId, code, FboBatchBox.IsChecked == true, true, FboSkipMpBox.IsChecked == true),
+            () => _client.FboScanProductAsync(jobId, code, FboBatchBox.IsChecked == true, true, autoClose: false),
             "Пик товара...",
             scanKey);
     }

@@ -48,6 +48,7 @@ public partial class MainWindow : Window
     private string _lastScanCode = "";
     private string _lastScanSku = "";
     private List<int> _lastScanLineIds = [];
+    private bool _fbsNeedFullReload;
     private DispatcherTimer? _fbsSearchTimer;
 
     private readonly PhotoLoader _photos;
@@ -1182,9 +1183,26 @@ public partial class MainWindow : Window
         var incoming = payload.Obj("job");
         if (incoming is null) return;
         if (incoming.Flag("delta") && _fbsJob is not null)
+        {
             _fbsJob = MergeFbsDelta(_fbsJob, incoming, payload);
+            var total = _fbsJob.Int("line_total");
+            if (total > 0 && _fbsJob.Arr("lines").Count != total)
+                _fbsNeedFullReload = true;
+        }
         else
+        {
             _fbsJob = incoming;
+            _fbsNeedFullReload = false;
+        }
+    }
+
+    private async Task ReloadFbsJobIfNeededAsync()
+    {
+        if (!_fbsNeedFullReload || _fbsJob is null) return;
+        var jobId = _fbsJob.Int("id");
+        _fbsNeedFullReload = false;
+        if (jobId <= 0) return;
+        _fbsJob = await _client.FbsOpenJobAsync(jobId);
     }
 
     private static string JsonNodeText(JsonNode? node)
@@ -1552,7 +1570,7 @@ public partial class MainWindow : Window
         var sku = _selectedGroup.Str("sku");
         var pid = _selectedGroup.IntOrNull("product_id");
         await HandleAllocateAsync(
-            () => _client.FbsPickSkuAsync(jobId, sku, pid, FbsBatchBox.IsChecked == true, !LabelsCached, FbsSkipMpBox.IsChecked == true),
+            () => _client.FbsPickSkuAsync(jobId, sku, pid, batch: true, includePdf: !LabelsCached, autoClose: false),
             "Выделение SKU...",
             sku.ToLowerInvariant());
     }
@@ -1610,7 +1628,7 @@ public partial class MainWindow : Window
             return;
         }
         await HandleAllocateAsync(
-            () => _client.FbsScanProductAsync(jobId, code, FbsBatchBox.IsChecked == true, !LabelsCached, FbsSkipMpBox.IsChecked == true),
+            () => _client.FbsScanProductAsync(jobId, code, FbsBatchBox.IsChecked == true, !LabelsCached, autoClose: false),
             "Пик товара...",
             scanKey);
     }
@@ -1763,13 +1781,25 @@ public partial class MainWindow : Window
                 payload = await worker();
             }
             ApplyFbsJobPayload(payload);
+            await ReloadFbsJobIfNeededAsync();
             var lines = payload.Arr("lines");
             if (lines.Count == 0 && payload.Obj("line") is { } one) lines = [one];
-            var payloadPdfs = payload.StrList("pdfs_base64");
+            var payloadPdfs = payload.StrListKeepEmpty("pdfs_base64");
             if (payloadPdfs.Count == 0 && payload.Str("pdf_base64").Length > 0)
                 payloadPdfs = [payload.Str("pdf_base64")];
             var lineIds = lines.Where(l => l.IntOrNull("id") is not null).Select(l => l.Int("id")).ToList();
-            var pdfs = jobId > 0 ? await ResolvePdfsAsync(jobId, lineIds, payloadPdfs) : [];
+            var rawPdfs = jobId > 0 ? await ResolvePdfsAsync(jobId, lineIds, payloadPdfs) : [];
+            var printable = new List<(JsonMap Line, byte[] Pdf)>();
+            for (var i = 0; i < lineIds.Count; i++)
+            {
+                var pdf = i < rawPdfs.Count ? rawPdfs[i] : [];
+                if (pdf is not { Length: > 0 }) continue;
+                var srcLine = i < lines.Count ? lines[i] : null;
+                if (srcLine is null) continue;
+                printable.Add((srcLine, pdf));
+            }
+            var pdfs = printable.Select(item => item.Pdf).ToList();
+            var printLines = printable.Select(item => item.Line).ToList();
             RenderFbsJob();
             await Dispatcher.Yield();
             var printed = 0;
@@ -1795,9 +1825,9 @@ public partial class MainWindow : Window
                 try
                 {
                     JsonMap? closed = null;
-                    for (var i = offset; i < offset + take && i < lines.Count; i++)
+                    for (var i = offset; i < offset + take && i < printLines.Count; i++)
                     {
-                        var closeLine = lines[i];
+                        var closeLine = printLines[i];
                         if (closeLine.IntOrNull("id") is null || closeLine.Str("status") == "done")
                             continue;
                         closed = await _client.FbsCloseLineAsync(jobId, closeLine.Int("id"));
@@ -1806,6 +1836,7 @@ public partial class MainWindow : Window
                     {
                         payload = closed;
                         ApplyFbsJobPayload(payload);
+                        await ReloadFbsJobIfNeededAsync();
                     }
                 }
                 catch (Exception ex)
@@ -1817,11 +1848,12 @@ public partial class MainWindow : Window
             var closedLines = payload.Arr("lines");
             if (closedLines.Count == 0 && payload.Obj("line") is { } cl) closedLines = [cl];
             var line = closedLines.FirstOrDefault() ?? lines.FirstOrDefault();
-            if (skip && lineIds.Count > 0)
+            if (skip && printLines.Count > 0)
             {
                 _lastScanCode = scanCode.Length > 0 ? scanCode : (line?.Str("sku") ?? "").ToLowerInvariant();
                 _lastScanSku = line?.Str("sku") ?? "";
-                _lastScanLineIds = printError is null ? lineIds : lineIds.Skip(printed).ToList();
+                var printedIds = printLines.Select(item => item.Int("id")).ToList();
+                _lastScanLineIds = printError is null ? printedIds : printedIds.Skip(printed).ToList();
             }
             RenderFbsJob();
             if (printError is not null)
@@ -1885,6 +1917,7 @@ public partial class MainWindow : Window
         {
             var payload = await _client.FbsSetLineStatusAsync(_fbsJob.Int("id"), lineId, next);
             ApplyFbsJobPayload(payload);
+            await ReloadFbsJobIfNeededAsync();
             RenderFbsJob();
             SetStatus($"Статус строки: {Paging.LineStatusRu(next)}");
             FocusScan();
